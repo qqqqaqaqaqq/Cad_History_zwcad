@@ -160,9 +160,8 @@ namespace CadEye.ViewCS
                     DatabaseProvider.Dispose();
                     if (user_file != null)
                     {
-                        File.Delete(user_file);
-                        File.Delete(user_log);
-                        Thread.Sleep(500);
+                        DeleteFileSafely(user_file);
+                        DeleteFileSafely(user_log);
                     }
                     string targetFile = "";
                     string targetFileName = "";
@@ -191,7 +190,32 @@ namespace CadEye.ViewCS
             return false;
         }
 
+        private void DeleteFileSafely(string path)
+        {
+            if (!File.Exists(path))
+                return;
 
+            const int maxRetries = 10;
+            const int delayMs = 200;
+
+            for (int i = 0; i < maxRetries; i++)
+            {
+                try
+                {
+                    File.Delete(path);
+                    if (!File.Exists(path))
+                        break; 
+                }
+                catch (IOException)
+                {
+                    Thread.Sleep(delayMs);
+                }
+                catch (UnauthorizedAccessException)
+                {
+                    Thread.Sleep(delayMs);
+                }
+            }
+        }
 
         /// <summary>
         /// 지더블유 캐드 텍스트 추출 이벤트

@@ -102,7 +102,7 @@ namespace CadEye
                 {
                     File.Delete(vm.user_file);
                     File.Delete(vm.user_log);
-                    Thread.Sleep(500);
+                    Thread.Sleep(1000);
                 }
             }
         }
