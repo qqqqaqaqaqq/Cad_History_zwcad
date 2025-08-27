@@ -1,0 +1,19 @@
+﻿<UserControl x:Class="CadEye.View.PdfContainer"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:local="clr-namespace:CadEye.View"
+             mc:Ignorable="d" 
+             d:DesignHeight="500" d:DesignWidth="800">
+    <Grid Background="Transparent">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="20"/>
+            <RowDefinition Height="50"/>
+        </Grid.RowDefinitions>
+
+        <Grid Grid.Row="0" x:Name="Pdf_Grid" Background="Transparent"/>
+        <Button Grid.Row="3" Content="I M A G E  N E W  F O R M" Style="{StaticResource Button_Glass}" Click="Image_Form"/>
+    </Grid>
+</UserControl>
