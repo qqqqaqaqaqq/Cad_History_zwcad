@@ -35,6 +35,7 @@ namespace CadEye.Lib
             Task.Run(Brdige_Queue);
             _watcher.Changed += (s, e) => Bridge_Event(s, e);
             _watcher.Created += (s, e) => Bridge_Event(s, e);
+            _watcher.Deleted += (s, e) => Bridge_Event(s, e);
             _watcher.Renamed += (s, e) => Bridge_Event(s, e);
             _watcher.EnableRaisingEvents = true;
         }
@@ -111,6 +112,9 @@ namespace CadEye.Lib
                         case WatcherChangeTypes.Changed:
                             File_A(e);
                             break;
+                        case WatcherChangeTypes.Deleted:
+                            File_A(e);
+                            break;
                         case WatcherChangeTypes.Renamed:
                             File_B(e);
                             break;
@@ -127,7 +131,9 @@ namespace CadEye.Lib
             try
             {
                 bool read_chk = vm.Read_Respone(e.FullPath, "File_A");
-                if (!read_chk) { return; }
+                if (!read_chk) {
+
+                    return; }
                 else
                 {
                     var child_node = DatabaseProvider.Child_Node;
