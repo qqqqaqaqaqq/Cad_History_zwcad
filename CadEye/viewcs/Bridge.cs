@@ -12,7 +12,6 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Forms.Integration;
-using System.Windows.Shapes;
 
 namespace CadEye.ViewCS
 {
@@ -239,12 +238,23 @@ namespace CadEye.ViewCS
                 {
                     var node = child_db.FindOne(x => x.File_Path == path);
                     if (!File.Exists(node.File_Path)) { continue; }
+
                     var file = new FileInfo(node.File_Path);
                     DateTime lastWriteTime = file.LastWriteTime;
                     lastWriteTime = lastWriteTime.AddTicks(-(lastWriteTime.Ticks % TimeSpan.TicksPerSecond));
                     if (node.Image.Count != 0)
                     { if (node.Image[node.Image.Count - 1].Time == lastWriteTime) { continue; } }
+
+
                     var source_node = Extrude_Indiviaul(node, node.File_Path);
+
+                    source_node.Event.Add(new EventEntry()
+                    {
+                        Time = lastWriteTime,
+                        Type = "Created",
+                        Description = "기존 파일"
+                    });
+
                     _db.Child_File_Table(source_node, null, DbAction.Upsert);
                 }
             }
@@ -316,6 +326,7 @@ namespace CadEye.ViewCS
                     byte[] data = PdfBit.RenderPdfPage(pathpdf);
                     source_node.Image.Add(new ImageEntry()
                     {
+                        Key = source_node.Key,
                         Data = data,
                         Time = time
                     });
@@ -409,7 +420,8 @@ namespace CadEye.ViewCS
             {
                 var _db = DatabaseProvider.Child_Node;
 
-                var parentNode = _db.FindAll().FirstOrDefault(x => x.Image.Any(ev => ev.Time == selected.Time));
+                var parentNode = _db.FindAll()
+                  .FirstOrDefault(x => x.Key == selected.Key && x.Image.Any(ev => ev.Time == selected.Time));
 
                 if (parentNode == null)
                 {

@@ -8,6 +8,7 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Windows.Input;
 
 namespace CadEye.Lib
 {
@@ -38,7 +39,6 @@ namespace CadEye.Lib
 
         private List<(FileSystemEventArgs, string, DateTime)> source_list = new List<(FileSystemEventArgs, string, DateTime)>();
         private ConcurrentQueue<FileSystemEventArgs> eventQueue = new ConcurrentQueue<FileSystemEventArgs>();
-        private DateTime ticktok = DateTime.MinValue;
         private bool isCollecting = false;
 
         public async void Bridge_Event(object sender, FileSystemEventArgs e)
@@ -154,6 +154,7 @@ namespace CadEye.Lib
 
                     source_node.Event.Add(new EventEntry()
                     {
+                        Key = source_node.Key,
                         Time = time,
                         Type = Event,
                         Description = $"삭제 : {relativefilename}"
@@ -164,6 +165,7 @@ namespace CadEye.Lib
                     {
                         source_node.Image.Add(new ImageEntry()
                         {
+                            Key = source_node.Key,
                             Time = time,
                             Data = target_node.Image[target_node.Image.Count() - 1].Data,
                         });
@@ -178,9 +180,8 @@ namespace CadEye.Lib
                     var child_node = DatabaseProvider.Child_Node;
                     var target_node = child_node.FindOne(x => x.File_Path == e.FullPath);
 
-                    long key = 0;
                     var source_node = new Child_File();
-
+                    long key = 0;
                     byte[] has;
 
                     has = file_check.Hash_Allocated_Unique(e.FullPath);
@@ -193,7 +194,10 @@ namespace CadEye.Lib
                         if (target_node_hash == null)
                         {
                             // Created
+                            var allkeys = child_node.FindAll().Select(x => x.Key);
+                            key = allkeys.Any() ? allkeys.Max() + 1 : 1;
 
+                            source_node.Key = key;
                             source_node.File_Path = e.FullPath;
                             source_node.File_Name = fileName;
                             source_node.HashToken = has;
@@ -203,6 +207,10 @@ namespace CadEye.Lib
                             source_node.Image = new List<ImageEntry>();
 
                             Event = "Created";
+
+                            _db.Child_File_Table(source_node, null, DbAction.Insert);
+                            File_Copy(e, time, key, Event);
+                            vm.File_input_Event();
                         }
                         else
                         {
@@ -226,6 +234,7 @@ namespace CadEye.Lib
 
                                 source_node.Event.Add(new EventEntry()
                                 {
+                                    Key = source_node.Key,
                                     Time = time,
                                     Type = Event,
                                     Description = $"위치 : {relativefilename}",
@@ -236,6 +245,7 @@ namespace CadEye.Lib
                                 {
                                     source_node.Image.Add(new ImageEntry()
                                     {
+                                        Key = source_node.Key,
                                         Time = time,
                                         Data = target_node_hash.Image[target_node_hash.Image.Count() - 1].Data,
                                     });
@@ -252,6 +262,11 @@ namespace CadEye.Lib
                                 var relative = Path.GetFileName(foldername);
                                 var relativefilename = Path.Combine(relative, Path.GetFileName(target_node_hash.File_Path));
 
+                                // Created
+                                var allkeys = child_node.FindAll().Select(x => x.Key);
+                                key = allkeys.Any() ? allkeys.Max() + 1 : 1;
+
+                                source_node.Key = key;
                                 source_node.File_Path = e.FullPath;
                                 source_node.File_Name = fileName;
                                 source_node.HashToken = has;
@@ -263,6 +278,7 @@ namespace CadEye.Lib
 
                                 source_node.Event.Add(new EventEntry()
                                 {
+                                    Key = source_node.Key,
                                     Time = time,
                                     Type = Event,
                                     Description = $"원본 : {relativefilename}"
@@ -273,6 +289,7 @@ namespace CadEye.Lib
                                 {
                                     source_node.Image.Add(new ImageEntry()
                                     {
+                                        Key = source_node.Key,
                                         Time = time,
                                         Data = target_node_hash.Image[target_node_hash.Image.Count() - 1].Data,
                                     });
@@ -288,7 +305,6 @@ namespace CadEye.Lib
                     {
                         // Changed
                         key = target_node.Key;
-
                         source_node.Key = key;
                         source_node.File_Path = e.FullPath;
                         source_node.File_Name = fileName;
@@ -298,11 +314,11 @@ namespace CadEye.Lib
                         source_node.Event = target_node.Event;
                         source_node.Image = target_node.Image;
                         Event = "Changed";
-                    }
 
-                    _db.Child_File_Table(source_node, null, DbAction.Upsert);
-                    File_Copy(e, time, key, Event);
-                    vm.File_input_Event();
+                        _db.Child_File_Table(source_node, null, DbAction.Upsert);
+                        File_Copy(e, time, key, Event);
+                        vm.File_input_Event();
+                    }
                 }
 
                 Debug.WriteLine($"File_A Result = true");
@@ -338,6 +354,7 @@ namespace CadEye.Lib
 
                     source_node.Event.Add(new EventEntry
                     {
+                        Key = source_node.Key,
                         Time = time,
                         Type = "Renamed",
                         Description = $"Pre Name : {re.OldFullPath}"
@@ -349,6 +366,7 @@ namespace CadEye.Lib
 
                         source_node.Image.Add(new ImageEntry
                         {
+                            Key = source_node.Key,
                             Time = time,
                             Data = (byte[])lastData.Clone()
                         });
@@ -425,12 +443,40 @@ namespace CadEye.Lib
         }
         // --------------------------------------------------------------------------------- 저장소에 대한 감시
 
+
+        private ConcurrentQueue<FileSystemEventArgs> eventQueue_repository = new ConcurrentQueue<FileSystemEventArgs>();
+
         public void SetupWatcher_repository(FileSystemWatcher _watcher)
         {
-            _watcher.Created += (s, e) => Repository(s, e);
+            Task.Run(Brdige_Queue_repository);
+            _watcher.Created += (s, e) => Bridge_Event_repository(s, e);
             _watcher.EnableRaisingEvents = true;
         }
-        private void Repository(object sender, FileSystemEventArgs e)
+        public void Bridge_Event_repository(object sender, FileSystemEventArgs e)
+        {
+            eventQueue_repository.Enqueue(e);
+        }
+        public async Task Brdige_Queue_repository()
+        {
+            while (true)
+            {
+                if (eventQueue_repository.TryDequeue(out var e))
+                {
+                    switch (e.ChangeType)
+                    {
+                        case WatcherChangeTypes.Created:
+                            Repository(e);
+                            break;
+                    }
+                }
+                else
+                {
+                    await Task.Delay(50);
+                }
+            }
+        }
+
+        private void Repository(FileSystemEventArgs e)
         {
             try
             {
@@ -461,8 +507,10 @@ namespace CadEye.Lib
 
                     source_node.Event.Add(new EventEntry()
                     {
+                        Key = source_node.Key,
                         Time = name_parts.Item1,
                         Type = name_parts.Item2,
+                        Description = $"{e.Name}"
                     });
 
                     int retry = 5;

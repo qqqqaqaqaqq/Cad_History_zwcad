@@ -43,11 +43,13 @@ namespace CadEye.Lib
 
     public class ImageEntry
     {
+        public long Key { get; set; }
         public DateTime Time { get; set; }
         public byte[] Data { get; set; }
     }
     public class EventEntry
     {
+        public long Key { get; set; }
         public DateTime Time { get; set; }
         public string Type { get; set; }
         public string Description { get; set; }
@@ -79,8 +81,9 @@ namespace CadEye.Lib
         DeleteAll,
         AllUpsert,
         Update,
-        Insert
+        Insert,  
     }
+
     public class Data_base
     {
         public readonly object _lock = new object();

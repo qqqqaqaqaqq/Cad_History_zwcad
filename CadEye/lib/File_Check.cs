@@ -34,6 +34,7 @@ namespace CadEye.Lib
                 var options = new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount };
                 var item_insert = new ConcurrentBag<Child_File>();
                 var existingFiles = childdb.FindAll().Select(x => new { x.File_Path, x.HashToken }).ToList();
+
                 Parallel.ForEach(fileSystemEntries, options, file =>
                 {
                     if (file.Extension.ToUpper() == ".DWG" || file.Extension.ToUpper() == ".DXF")
