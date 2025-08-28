@@ -29,7 +29,6 @@ namespace CadEye
             Bridge.Instance.pdfpage = Pdf_Viewer;
             Bridge.Instance.pdfpage2 = Pdf_Viewer2;
         }
-
         private void Left_Click(object sender, MouseButtonEventArgs e)
         {
             this.DragMove();
@@ -55,8 +54,6 @@ namespace CadEye
                     img.RenderTransform = new ScaleTransform(1, 1);
             }
         }
-
-
         public static bool isManger;
         public Cad_FileView fileview = new Cad_FileView();
         public void MainWindow_Loaded(object sender, RoutedEventArgs e)
@@ -91,7 +88,6 @@ namespace CadEye
                 System.Windows.MessageBox.Show(ex.Message, "Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
-
         public void MainWindow_Closing(object sender, EventArgs e)
         {
             if (isManger == false)
@@ -105,6 +101,8 @@ namespace CadEye
                     Thread.Sleep(1000);
                 }
             }
+            else
+            { return; }
         }
     }
 }

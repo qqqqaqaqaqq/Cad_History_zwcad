@@ -25,14 +25,19 @@ namespace CadEye.View
         WindowsFormsHost allhost;
         public void SetHost(WindowsFormsHost host)
         {
-            Pdf_Grid.Children.Add(host);
+            Application.Current.Dispatcher.Invoke(() =>
+            {
+                Pdf_Grid.Children.Add(host);
+            });
             allhost = host;
         }
         public void ResetHost()
         {
-            Pdf_Grid.Children.Clear();
+            Application.Current.Dispatcher.Invoke(() =>
+            {
+                Pdf_Grid.Children.Clear();
+            });
         }
-
         public void Image_Form(object sender, RoutedEventArgs e)
         {
             vm.OpenPdfInNewWindow();

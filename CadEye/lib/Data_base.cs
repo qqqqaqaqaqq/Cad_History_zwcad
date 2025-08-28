@@ -78,12 +78,12 @@ namespace CadEye.Lib
         Delete,
         DeleteAll,
         AllUpsert,
-        Update
+        Update,
+        Insert
     }
     public class Data_base
     {
         public readonly object _lock = new object();
-
         public bool Child_File_Table(Child_File node, ConcurrentBag<Child_File> list, DbAction action)
         {
             var child_db = DatabaseProvider.Child_Node;
@@ -98,11 +98,11 @@ namespace CadEye.Lib
                             break;
 
                         case DbAction.Delete:
-                            child_db.Delete(node.File_Path);
+                            child_db.Delete(node.Key);
                             break;
 
                         case DbAction.DeleteAll:
-                            child_db.DeleteAll();
+                            DatabaseProvider.Instance.DropCollection("Child_Node");
                             break;
 
                         case DbAction.AllUpsert:
@@ -111,6 +111,10 @@ namespace CadEye.Lib
 
                         case DbAction.Update:
                             child_db.Update(node);
+                            break;
+
+                        case DbAction.Insert:
+                            child_db.Insert(node);
                             break;
                     }
                 }

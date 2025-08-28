@@ -5,8 +5,8 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
 using System.Threading;
-using System.Windows.Controls;
-using System.Xml.Linq;
+using System.Threading.Tasks;
+using System.Collections.Concurrent;
 using ZWCAD;
 
 namespace CadEye.Lib
@@ -75,10 +75,53 @@ namespace CadEye.Lib
             Plot_Check(layouts);
             zwcad_in.Plot.PlotToFile(path);
 
-            foreach (object obj_entity in zwcad_in.ModelSpace)
+
+            var buffer1 = new ConcurrentBag<string>();
+            var buffer2 = new ConcurrentBag<string>();
+
+            Parallel.ForEach(zwcad_in.ModelSpace.Cast<object>(), obj_entity =>
             {
-                Entity_Check(obj_entity, autocad_text);
-            }
+                var zwcad_entity = obj_entity as ZcadEntity;
+                if (zwcad_entity == null) return;
+                string content = "";
+                int type = 0;
+                string entityName = zwcad_entity.EntityName.ToUpper();
+
+                switch (entityName)
+                {
+                    case "ACDBTEXT":
+                        content = ((ZcadText)zwcad_entity).TextString;
+                        (content, type) = Text_Convey(content);
+                        break;
+                    case "ACDBMTEXT":
+                        content = ((ZcadMText)zwcad_entity).TextString;
+                        (content, type) = Text_Convey(content);
+                        break;
+                    default:
+                        return;
+                }
+
+                if (type == 0) return;
+
+                var newItems = content.Split(new[] { '\n' }, StringSplitOptions.RemoveEmptyEntries);
+
+                if (type == 1)
+                {
+                    foreach (var item in newItems)
+                        buffer1.Add(item);
+                }
+                else if (type == 2)
+                {
+                    foreach (var item in newItems)
+                        buffer2.Add(item);
+                }
+            });
+
+            autocad_text.Item1.AddRange(buffer1);
+            autocad_text.Item2.AddRange(buffer2);
+
+
+            // 가비지로 회수 순서 지킬 것
             Marshal.FinalReleaseComObject(zwcad_in.ModelSpace);
             Marshal.FinalReleaseComObject(zwcad_in.Layouts);
             Marshal.FinalReleaseComObject(zwcad_in.Plot);
@@ -94,64 +137,26 @@ namespace CadEye.Lib
         {
             var modelLayout = layouts.Item("Model");
             modelLayout.ConfigName = "ZWCAD PDF(High Quality Print).pc5";
+            modelLayout.RefreshPlotDeviceInfo();
             modelLayout.CanonicalMediaName = "A1";
             modelLayout.PlotWithPlotStyles = true;
             modelLayout.StyleSheet = "monochrome.ctb";
-            modelLayout.RefreshPlotDeviceInfo();
             modelLayout.CenterPlot = true;
             modelLayout.PlotRotation = ZcPlotRotation.zc0degrees;
             modelLayout.PlotType = ZcPlotType.zcExtents;
-            modelLayout.RefreshPlotDeviceInfo();
-        }
-        public void Entity_Check(object obj_entity, (List<string>, List<string>) autocad_text)
-        {
-            if (obj_entity is ZcadEntity zwcad_entity)
-            {
-                string[] newItems;
-                int type = 0;
-                string content = "";
-                string entityName = zwcad_entity.EntityName.ToUpper();
-                switch (entityName)
-                {
-                    case "ACDBTEXT":
-                        var textEntity = (ZcadText)zwcad_entity;
-                        content = textEntity.TextString;
-                        (content, type) = Text_Convey(content);
-                        break;
-                    case "ACDBMTEXT":
-                        var mtextEntity = (ZcadMText)zwcad_entity;
-                        content = mtextEntity.TextString;
-                        (content, type) = Text_Convey(content);
-                        break;
-                }
-
-                switch (type)
-                {
-                    case 1:
-                        newItems = content.Split(new[] { '\n' }, StringSplitOptions.RemoveEmptyEntries);
-                        autocad_text.Item1.AddRange(newItems);
-                        break;
-                    case 2:
-                        newItems = content.Split(new[] { '\n' }, StringSplitOptions.RemoveEmptyEntries);
-                        autocad_text.Item2.AddRange(newItems);
-                        break;
-                    case 0:
-                        break;
-                }
-            }
         }
         private static (string, int) Text_Convey(string text)
         {
             int type = 0;
             if (string.IsNullOrEmpty(text))
                 return (text, type);
+
             try
             {
                 text = text.Replace("{", "").Replace("}", "");
-                text = Regex.Replace(text, @"\\F[^;]+;", "");
+                text = Regex.Replace(text, @"\\[^;]+;", "");
                 text = text.Replace(@"\P", "\n");
                 text = text.Trim();
-
                 if (Regex.IsMatch(text, "<\\s*TAG\\s*>", RegexOptions.IgnoreCase))
                 {
                     text = Regex.Replace(text, "<\\s*/?\\s*TAG\\s*>", "", RegexOptions.IgnoreCase);
@@ -170,7 +175,7 @@ namespace CadEye.Lib
             {
                 Debug.WriteLine($"[Error] {ex.Message}");
                 Debug.WriteLine($"[StackTrace] {ex.StackTrace}");
-                return (text.Trim(), type); ;
+                return (text.Trim(), type);
             }
         }
     }

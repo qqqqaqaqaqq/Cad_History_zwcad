@@ -1,5 +1,4 @@
 ﻿using CadEye.ViewCS;
-using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -9,9 +8,6 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Timers;
-using System.Windows.Documents;
-using ZWCAD;
 
 namespace CadEye.Lib
 {
@@ -47,35 +43,32 @@ namespace CadEye.Lib
 
         public async void Bridge_Event(object sender, FileSystemEventArgs e)
         {
-            bool read_chk = vm.Read_Respone(e.FullPath, "Bridge_Event");
-            if (!read_chk) { return; }
-            else
+            bool check_ext = vm.FilterExt(e.FullPath);
+            if (!check_ext) return;
+            DateTime current_time = DateTime.Now;
+            source_list.Add((e, e.FullPath, current_time));
+
+            if (!isCollecting)
             {
-                DateTime current_time = DateTime.Now;
-                source_list.Add((e, e.FullPath, current_time));
-
-                if (!isCollecting)
+                if (source_list.Count() > 0)
                 {
-                    if (source_list.Count() > 0)
+                    isCollecting = true;
+                    await Task.Delay(300);
+
+                    List<(FileSystemEventArgs, string, DateTime)> target_list =
+                        new List<(FileSystemEventArgs, string, DateTime)>();
+                    List<FileSystemEventArgs> filter_list = new List<FileSystemEventArgs>();
+
+                    foreach (var list in source_list)
                     {
-                        isCollecting = true;
-                        await Task.Delay(300);
-
-                        List<(FileSystemEventArgs, string, DateTime)> target_list =
-                            new List<(FileSystemEventArgs, string, DateTime)>();
-                        List<FileSystemEventArgs> filter_list = new List<FileSystemEventArgs>();
-
-                        foreach (var list in source_list)
-                        {
-                            target_list.Add(list);
-                        }
-                        filter_list = Detected(target_list);
-                        foreach (var list in filter_list.ToList())
-                        {
-                            eventQueue.Enqueue(list);
-                        }
-                        isCollecting = false;
+                        target_list.Add(list);
                     }
+                    filter_list = Detected(target_list);
+                    foreach (var list in filter_list.ToList())
+                    {
+                        eventQueue.Enqueue(list);
+                    }
+                    isCollecting = false;
                 }
             }
         }
@@ -97,26 +90,33 @@ namespace CadEye.Lib
 
             return uniqueEvents.Values.ToList();
         }
-
         public async Task Brdige_Queue()
         {
             while (true)
             {
                 if (eventQueue.TryDequeue(out var e))
                 {
+                    DateTime time = new DateTime(
+                        DateTime.Now.Year,
+                        DateTime.Now.Month,
+                        DateTime.Now.Day,
+                        DateTime.Now.Hour,
+                        DateTime.Now.Minute,
+                        DateTime.Now.Second
+                    );
                     switch (e.ChangeType)
                     {
                         case WatcherChangeTypes.Created:
-                            File_A(e);
+                            File_A(e, time);
                             break;
                         case WatcherChangeTypes.Changed:
-                            File_A(e);
+                            File_A(e, time);
                             break;
                         case WatcherChangeTypes.Deleted:
-                            File_A(e);
+                            File_A(e, time);
                             break;
                         case WatcherChangeTypes.Renamed:
-                            File_B(e);
+                            File_B(e, time);
                             break;
                     }
                 }
@@ -126,14 +126,53 @@ namespace CadEye.Lib
                 }
             }
         }
-        private void File_A(FileSystemEventArgs e)
+        private void File_A(FileSystemEventArgs e, DateTime time)
         {
             try
             {
-                bool read_chk = vm.Read_Respone(e.FullPath, "File_A");
-                if (!read_chk) {
+                bool read_chk = vm.Read_Respone(e.FullPath, "File_A", e.ChangeType.ToString());
+                if (!read_chk)
+                {
+                    // Deleted
+                    var child_node = DatabaseProvider.Child_Node;
+                    var target_node = child_node.FindOne(x => x.File_Path == e.FullPath);
 
-                    return; }
+                    var foldername = Path.GetDirectoryName(target_node.File_Path);
+                    var relative = Path.GetFileName(foldername);
+                    var relativefilename = Path.Combine(relative, Path.GetFileName(target_node.File_Path));
+                    var source_node = new Child_File();
+
+                    source_node.Key = target_node.Key;
+                    source_node.File_Path = e.FullPath;
+                    source_node.HashToken = target_node.HashToken;
+                    source_node.File_Name = target_node.File_Name;
+                    source_node.list = target_node.list;
+                    source_node.Feature = target_node.Feature;
+                    source_node.Event = target_node.Event;
+                    source_node.Image = target_node.Image;
+                    string Event = "Deleted";
+
+                    source_node.Event.Add(new EventEntry()
+                    {
+                        Time = time,
+                        Type = Event,
+                        Description = $"삭제 : {relativefilename}"
+                    });
+
+
+                    if (source_node.Image.Count() > 0)
+                    {
+                        source_node.Image.Add(new ImageEntry()
+                        {
+                            Time = time,
+                            Data = target_node.Image[target_node.Image.Count() - 1].Data,
+                        });
+                    }
+
+                    _db.Child_File_Table(source_node, null, DbAction.Upsert);
+                    vm.File_input_Event();
+                    return;
+                }
                 else
                 {
                     var child_node = DatabaseProvider.Child_Node;
@@ -145,9 +184,7 @@ namespace CadEye.Lib
                     byte[] has;
 
                     has = file_check.Hash_Allocated_Unique(e.FullPath);
-                    string dir = Path.GetFileName(Path.GetDirectoryName(e.FullPath));
-                    string fileName = e.Name;
-                    fileName = Path.Combine(dir, fileName);
+                    string fileName = Path.GetFileName(e.FullPath);
                     string Event = "";
 
                     if (target_node == null)
@@ -156,10 +193,7 @@ namespace CadEye.Lib
                         if (target_node_hash == null)
                         {
                             // Created
-                            var keys = child_node.FindAll().Select(x => x.Key);
-                            key = keys.Any() ? keys.Max() + 1 : 1;
 
-                            source_node.Key = key;
                             source_node.File_Path = e.FullPath;
                             source_node.File_Name = fileName;
                             source_node.HashToken = has;
@@ -172,31 +206,82 @@ namespace CadEye.Lib
                         }
                         else
                         {
-                            // Moved
-                            key = target_node_hash.Key;
-
-                            dir = Path.GetFileName(Path.GetDirectoryName(e.FullPath));
-                            fileName = Path.GetFileName(e.Name);
-                            fileName = Path.Combine(dir, fileName);
-
-                            source_node.Key = key;
-                            source_node.File_Path = e.FullPath;
-                            source_node.File_Name = fileName;
-                            source_node.HashToken = has;
-                            source_node.list = target_node_hash.list;
-                            source_node.Feature = target_node_hash.Feature;
-                            source_node.Event = target_node_hash.Event;
-                            source_node.Image = target_node_hash.Image;
-                            Event = "Moved";
-
-                            source_node.Event.Add(new EventEntry()
+                            if (!File.Exists(target_node_hash.File_Path))
                             {
-                                Time = DateTime.Now,
-                                Type = Event,
-                            });
-                            _db.Child_File_Table(source_node, null, DbAction.Upsert);
-                            vm.File_input_Event();
-                            return;
+                                // Moved
+                                key = target_node_hash.Key;
+                                var foldername = Path.GetDirectoryName(e.FullPath);
+                                var relative = Path.GetFileName(foldername);
+                                var relativefilename = Path.Combine(relative, Path.GetFileName(e.FullPath));
+
+                                source_node.Key = key;
+                                source_node.File_Path = e.FullPath;
+                                source_node.File_Name = fileName;
+                                source_node.HashToken = has;
+                                source_node.list = target_node_hash.list;
+                                source_node.Feature = target_node_hash.Feature;
+                                source_node.Event = target_node_hash.Event;
+                                source_node.Image = target_node_hash.Image;
+                                Event = "Moved";
+
+                                source_node.Event.Add(new EventEntry()
+                                {
+                                    Time = time,
+                                    Type = Event,
+                                    Description = $"위치 : {relativefilename}",
+                                });
+
+
+                                if (source_node.Image.Count() > 0)
+                                {
+                                    source_node.Image.Add(new ImageEntry()
+                                    {
+                                        Time = time,
+                                        Data = target_node_hash.Image[target_node_hash.Image.Count() - 1].Data,
+                                    });
+                                }
+
+                                _db.Child_File_Table(source_node, null, DbAction.Upsert);
+                                vm.File_input_Event();
+                                return;
+                            }
+                            else
+                            {
+                                // Copyed
+                                var foldername = Path.GetDirectoryName(target_node_hash.File_Path);
+                                var relative = Path.GetFileName(foldername);
+                                var relativefilename = Path.Combine(relative, Path.GetFileName(target_node_hash.File_Path));
+
+                                source_node.File_Path = e.FullPath;
+                                source_node.File_Name = fileName;
+                                source_node.HashToken = has;
+                                source_node.list = target_node_hash.list;
+                                source_node.Feature = target_node_hash.Feature;
+                                source_node.Event = target_node_hash.Event;
+                                source_node.Image = target_node_hash.Image;
+                                Event = "Copyed";
+
+                                source_node.Event.Add(new EventEntry()
+                                {
+                                    Time = time,
+                                    Type = Event,
+                                    Description = $"원본 : {relativefilename}"
+                                });
+
+
+                                if (source_node.Image.Count() > 0)
+                                {
+                                    source_node.Image.Add(new ImageEntry()
+                                    {
+                                        Time = time,
+                                        Data = target_node_hash.Image[target_node_hash.Image.Count() - 1].Data,
+                                    });
+                                }
+
+                                _db.Child_File_Table(source_node, null, DbAction.Upsert);
+                                vm.File_input_Event();
+                                return;
+                            }
                         }
                     }
                     else
@@ -216,7 +301,7 @@ namespace CadEye.Lib
                     }
 
                     _db.Child_File_Table(source_node, null, DbAction.Upsert);
-                    File_Copy(e, DateTime.Now, key, Event);
+                    File_Copy(e, time, key, Event);
                     vm.File_input_Event();
                 }
 
@@ -227,7 +312,7 @@ namespace CadEye.Lib
                 Debug.WriteLine($"File_A Result = false, {ex.Message}");
             }
         }
-        private void File_B(FileSystemEventArgs e)
+        private void File_B(FileSystemEventArgs e, DateTime time)
         {
             try
             {
@@ -240,12 +325,11 @@ namespace CadEye.Lib
                     var target_node = DatabaseProvider.Child_Node.FindOne(x => x.File_Path == re.OldFullPath);
                     if (target_node == null) return;
 
-                    DateTime time = DateTime.Now;
                     var source_node = new Child_File();
-
+                    var filename = Path.GetFileName(e.FullPath);
                     source_node.Key = target_node.Key;
                     source_node.File_Path = e.FullPath;
-                    source_node.File_Name = Path.Combine(Path.GetFileName(Path.GetDirectoryName(e.FullPath)), Path.GetFileName(e.FullPath));
+                    source_node.File_Name = filename;
                     source_node.HashToken = file_check.Hash_Allocated_Unique(e.FullPath);
                     source_node.list = target_node.list;
                     source_node.Feature = target_node.Feature;

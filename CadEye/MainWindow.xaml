@@ -10,7 +10,7 @@
         WindowStartupLocation="CenterScreen"
         Background="Transparent"
         Height="800" 
-        Width="1200"
+        Width="1400"
         Title="Cad History (Zwcad version)">
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
@@ -20,8 +20,8 @@
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="0"/>
-                <RowDefinition Height="204.04"/>
-                <RowDefinition Height="195.96"/>
+                <RowDefinition Height="200"/>
+                <RowDefinition Height="200"/>
                 <RowDefinition Height="*"/>
                 <RowDefinition Height="30"/>
             </Grid.RowDefinitions>
@@ -29,7 +29,7 @@
             <!-- Body -->
             <Grid Grid.Row="1" Grid.RowSpan="2">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="250"/>
+                    <ColumnDefinition Width="450"/>
                     <ColumnDefinition Width="0"/>
                     <ColumnDefinition Width="250"/>
                     <ColumnDefinition Width="0"/>

@@ -12,14 +12,6 @@ namespace CadEye.Lib
 {
     public class File_Check
     {
-
-        /// <summary>
-        /// 폴더 내부 파일을 병렬로 찾은 후
-        /// 데이터 베이스에 넣음
-        /// 데이터 베이스 이벤트는 Lib.Data_base에 조건 함수 정리 해둠
-        /// item_insert Data base에서 node 형식 가져왔으므로 주의.
-        /// </summary>
-
         private Data_base _db = new Data_base();
         public Bridge vm
         {
@@ -40,33 +32,23 @@ namespace CadEye.Lib
                     .Where(f => (f.Attributes & FileAttributes.ReparsePoint) == 0)
                     .ToList();
                 var options = new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount };
-
                 var item_insert = new ConcurrentBag<Child_File>();
-
-                long accessNumber = 0;
-                var keys = childdb.FindAll().Select(x => (long?)x.Key);
-                long maxKey = keys.Any() ? keys.Max().Value : 0;
-                accessNumber = maxKey;
-
+                var existingFiles = childdb.FindAll().Select(x => new { x.File_Path, x.HashToken }).ToList();
                 Parallel.ForEach(fileSystemEntries, options, file =>
                 {
                     if (file.Extension.ToUpper() == ".DWG" || file.Extension.ToUpper() == ".DXF")
                     {
                         if ((file.Attributes & FileAttributes.Directory) == 0)
                         {
-                            string[] file_name_parts = file.FullName.Split('\\');
-                            string relativePath = file_name_parts[file_name_parts.Length - 2] + "\\" + file_name_parts[file_name_parts.Length - 1];
                             byte[] hash = Hash_Allocated_Unique(file.FullName);
 
-                            bool check = childdb.FindAll().Any(x => x.File_Path == file.FullName && x.HashToken.SequenceEqual(hash)); // Data_base에서 가져옴.
+                            bool check = existingFiles.Any(x => x.File_Path == file.FullName && x.HashToken.SequenceEqual(hash));
                             if (check) { return; }
-                            accessNumber = System.Threading.Interlocked.Increment(ref accessNumber);
 
                             var node = new Child_File();
 
-                            node.Key = accessNumber;
                             node.File_Path = file.FullName;
-                            node.File_Name = relativePath;
+                            node.File_Name = file.Name;
                             node.HashToken = hash;
                             node.Event = new List<EventEntry>();
                             node.Image = new List<ImageEntry>();
@@ -75,11 +57,6 @@ namespace CadEye.Lib
                         }
                     }
                 });
-
-                GC.Collect();
-                GC.WaitForPendingFinalizers();
-                GC.Collect();
-
                 return item_insert;
             }
             catch (Exception ex)

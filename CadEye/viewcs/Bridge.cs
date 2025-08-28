@@ -19,7 +19,7 @@ namespace CadEye.ViewCS
     public class FileInfoItem
     {
         public long Key { get; set; }
-        public string FileName { get; set; }
+        public string FilePath { get; set; }
     }
 
     public class Bridge
@@ -71,7 +71,6 @@ namespace CadEye.ViewCS
             }
             pathset = path;
         }
-
         public (string, bool) pathset;
         public async Task MainView_Start_Load_Event()
         {
@@ -88,8 +87,6 @@ namespace CadEye.ViewCS
                 Debug.WriteLine($"MainView_Start_Load_Event : {ex.Message}");
             }
         }
-
-
 
         /// <summary>
         /// List Box에 파일 데이터 담아주는 역할
@@ -113,7 +110,7 @@ namespace CadEye.ViewCS
                          .Select(node => new FileInfoItem
                          {
                              Key = node.Key,
-                             FileName = node.File_Name
+                             FilePath = node.File_Path
                          })
                          .ToList();
                      return files;
@@ -137,8 +134,6 @@ namespace CadEye.ViewCS
         {
             await File_input();
         }
-
-
 
         /// <summary>
         /// 읽기 모드
@@ -189,7 +184,6 @@ namespace CadEye.ViewCS
             }
             return false;
         }
-
         private void DeleteFileSafely(string path)
         {
             if (!File.Exists(path))
@@ -204,7 +198,7 @@ namespace CadEye.ViewCS
                 {
                     File.Delete(path);
                     if (!File.Exists(path))
-                        break; 
+                        break;
                 }
                 catch (IOException)
                 {
@@ -264,7 +258,6 @@ namespace CadEye.ViewCS
             await Task.Run(() => Extrude());
         }
 
-
         /// <summary>
         /// 리스트 클릭 시 오토캐드에서 추출한 문자열 화면에 표시
         /// </summary>
@@ -275,7 +268,7 @@ namespace CadEye.ViewCS
             try
             {
                 var child_db = DatabaseProvider.Child_Node;
-                var child_node = child_db.FindOne(x => x.File_Name == selectedItem);
+                var child_node = child_db.FindOne(x => x.File_Path == selectedItem);
                 if (child_node == null) { return; }
                 System.Windows.Application.Current.Dispatcher.Invoke(() =>
                 {
@@ -304,7 +297,6 @@ namespace CadEye.ViewCS
             }
         }
 
-
         /// <summary>
         /// DB에 Pdf 이미지 삽입 벡터 형식
         /// </summary>
@@ -321,11 +313,13 @@ namespace CadEye.ViewCS
                 if (System.IO.Path.GetExtension(source_node.File_Path).ToUpper() == ".DWG" || System.IO.Path.GetExtension(source_node.File_Path).ToUpper() == ".DXF")
                 {
                     string pathpdf = System.IO.Path.ChangeExtension(source_file, ".pdf");
+                    byte[] data = PdfBit.RenderPdfPage(pathpdf);
                     source_node.Image.Add(new ImageEntry()
                     {
-                        Data = PdfBit.RenderPdfPage(pathpdf),
+                        Data = data,
                         Time = time
                     });
+
                     File.Delete(pathpdf);
                     return source_node;
                 }
@@ -365,7 +359,6 @@ namespace CadEye.ViewCS
             await Task.Run(() => Pdf_Bitmap());
         }
 
-
         /// <summary>
         /// Main 미리보기 이미지 삽입 LoadPdf
         /// Compare 미리보기 이미지 삽입 LoadPdf2
@@ -381,48 +374,67 @@ namespace CadEye.ViewCS
             try
             {
                 var child_db = DatabaseProvider.Child_Node;
-                var child_node = child_db.FindOne(x => x.File_Name == selectedItem);
+                var child_node = child_db.FindOne(x => x.File_Path == selectedItem);
                 if (child_node == null) { return; }
-                if (child_node.Image.Count == 0)
+                Application.Current.Dispatcher.Invoke(() =>
                 {
+                    if (child_node.Image.Count == 0)
+                    {
+                        pdfpage.ResetHost();
+                    }
+                    else
+                    {
+                        host = PdfBit.Pdf_Created(child_node.Image[child_node.Image.Count - 1].Data);
+                        Main_Image = child_node.Image[child_node.Image.Count - 1].Data;
+                    }
                     pdfpage.ResetHost();
-                }
-                host = PdfBit.Pdf_Created(child_node.Image[child_node.Image.Count - 1].Data);
-                Main_Image = child_node.Image[child_node.Image.Count - 1].Data;
-
-                pdfpage.ResetHost();
-                pdfpage2.ResetHost();
-                pdfpage.SetHost(host);
+                    pdfpage2.ResetHost();
+                    pdfpage.SetHost(host);
+                });
             }
             catch (Exception ex)
             {
                 Debug.WriteLine($"LoadPdf : {ex.Message}");
             }
         }
+        public async Task Pdf_Load_btn()
+        {
+            await Task.Run(() => LoadPdf());
+        }
+
+
         private void LoadPdf2(EventEntry selected)
         {
             try
             {
                 var _db = DatabaseProvider.Child_Node;
-                var parentNode = _db.FindAll().FirstOrDefault(x => x.Event.Any(ev => ev.Time == selected.Time));
-                if (parentNode == null) { return; }
+
+                var parentNode = _db.FindAll().FirstOrDefault(x => x.Image.Any(ev => ev.Time == selected.Time));
+
+                if (parentNode == null)
+                {
+                    pdfpage2.ResetHost();
+                    return;
+                }
                 if (parentNode != null)
                 {
-                    int eventIndex = parentNode.Event.FindIndex(ev => ev.Time == selected.Time);
-
-                    if (eventIndex >= 0 && eventIndex < parentNode.Image.Count)
+                    Application.Current.Dispatcher.Invoke(() =>
                     {
-                        var imageData = parentNode.Image[eventIndex].Data;
-                        Compare_Image = imageData;
+                        int eventIndex = parentNode.Image.FindIndex(ev => ev.Time == selected.Time);
 
-                        pdfpage2.ResetHost();
-                        host2 = PdfBit.Pdf_Created(imageData);
-                        pdfpage2.SetHost(host2);
-                    }
-                    else
-                    {
-                        pdfpage2.ResetHost();
-                    }
+                        if (eventIndex >= 0 && eventIndex < parentNode.Image.Count)
+                        {
+                            var imageData = parentNode.Image[eventIndex].Data;
+                            Compare_Image = imageData;
+                            pdfpage2.ResetHost();
+                            host2 = PdfBit.Pdf_Created(imageData);
+                            pdfpage2.SetHost(host2);
+                        }
+                        else
+                        {
+                            pdfpage2.ResetHost();
+                        }
+                    });
                 }
             }
             catch (Exception ex)
@@ -430,16 +442,10 @@ namespace CadEye.ViewCS
                 Debug.WriteLine($"LoadPdf2 : {ex.Message}");
             }
         }
-        public void Pdf_Load_btn()
-        {
-            LoadPdf();
-        }
         public void Pdf_Load_btn2(EventEntry selected)
         {
             LoadPdf2(selected);
         }
-
-
 
         /// <summary>
         /// 이미지 새폼에서 열기
@@ -450,7 +456,7 @@ namespace CadEye.ViewCS
             try
             {
                 var child_db = DatabaseProvider.Child_Node;
-                var child_node = child_db.FindOne(x => x.File_Name == selectedItem);
+                var child_node = child_db.FindOne(x => x.File_Path == selectedItem);
                 if (child_node == null) { return; }
                 var window = new System.Windows.Window
                 {
@@ -476,7 +482,6 @@ namespace CadEye.ViewCS
             }
         }
 
-
         /// <summary>
         /// 파일명 태그 검색 기능
         /// </summary>
@@ -484,81 +489,21 @@ namespace CadEye.ViewCS
         {
             try
             {
-                if (text != "")
-                {
-                    var filesWithKey = await Task.Run(() =>
-                    {
-                        var child_db = DatabaseProvider.Child_Node;
-                        var child_nodes = child_db.FindAll();
+                string searchText = string.IsNullOrWhiteSpace(text) ? "" : text.Replace(" ", "").ToUpper();
 
-                        return child_nodes
-                            .Where(node => node.File_Name.ToUpper().Contains(text.ToUpper()))
-                            .Select(node => new FileInfoItem
-                            {
-                                Key = node.Key,
-                                FileName = node.File_Name
-                            })
-                            .ToList();
-                    });
-
-                    Application.Current.Dispatcher.Invoke(() =>
-                    {
-                        Files.Clear();
-                        foreach (var file in filesWithKey)
-                        {
-                            Files.Add(file);
-                        }
-                    });
-                }
-                else
-                {
-                    var filesWithKey = await Task.Run(() =>
-                    {
-                        var child_db = DatabaseProvider.Child_Node;
-                        var child_nodes = child_db.FindAll();
-
-                        return child_nodes
-                            .Select(node => new FileInfoItem
-                            {
-                                Key = node.Key,
-                                FileName = node.File_Name
-                            })
-                            .ToList();
-                    });
-
-                    Application.Current.Dispatcher.Invoke(() =>
-                    {
-                        Files.Clear();
-                        foreach (var file in filesWithKey)
-                        {
-                            Files.Add(file);
-                        }
-                    });
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"Enter_SearchAsync : {ex.Message}");
-            }
-        }
-        public async Task Tag_Enter_SearchAsync(string text)
-        {
-            try
-            {
                 var filesWithKey = await Task.Run(() =>
                 {
                     var child_db = DatabaseProvider.Child_Node;
                     var child_nodes = child_db.FindAll();
 
-                    if (!string.IsNullOrWhiteSpace(text))
+                    if (!string.IsNullOrEmpty(searchText))
                     {
                         return child_nodes
-                            .Where(node => node.Feature != null &&
-                                   node.Feature.Any(f => f != null && f.IndexOf(text, StringComparison.OrdinalIgnoreCase) >= 0))
+                            .Where(node => node.File_Path.Replace(" ", "").ToUpper().Contains(searchText))
                             .Select(node => new FileInfoItem
                             {
                                 Key = node.Key,
-                                FileName = node.File_Name
+                                FilePath = node.File_Path
                             })
                             .ToList();
                     }
@@ -568,7 +513,58 @@ namespace CadEye.ViewCS
                             .Select(node => new FileInfoItem
                             {
                                 Key = node.Key,
-                                FileName = node.File_Name
+                                FilePath = node.File_Path
+                            })
+                            .ToList();
+                    }
+                });
+
+                Application.Current.Dispatcher.Invoke(() =>
+                {
+                    Files.Clear();
+                    foreach (var file in filesWithKey)
+                    {
+                        Files.Add(file);
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"File_Name_Enter_SearchAsync : {ex.Message}");
+            }
+        }
+
+        public async Task Tag_Enter_SearchAsync(string text)
+        {
+            try
+            {
+                var searchText = string.IsNullOrWhiteSpace(text) ? "" : text.Replace(" ", "");
+
+                var filesWithKey = await Task.Run(() =>
+                {
+                    var child_db = DatabaseProvider.Child_Node;
+                    var child_nodes = child_db.FindAll();
+
+                    if (!string.IsNullOrWhiteSpace(searchText))
+                    {
+                        return child_nodes
+                            .Where(node => node.Feature != null &&
+                                   node.Feature.Any(f => f != null && f.Replace(" ", "")
+                                        .IndexOf(searchText, StringComparison.OrdinalIgnoreCase) >= 0))
+                            .Select(node => new FileInfoItem
+                            {
+                                Key = node.Key,
+                                FilePath = node.File_Path
+                            })
+                            .ToList();
+                    }
+                    else
+                    {
+                        return child_nodes
+                            .Select(node => new FileInfoItem
+                            {
+                                Key = node.Key,
+                                FilePath = node.File_Path
                             })
                             .ToList();
                     }
@@ -589,7 +585,6 @@ namespace CadEye.ViewCS
             }
         }
 
-
         /// <summary>
         /// 데이터 리셋
         /// </summary>
@@ -605,7 +600,6 @@ namespace CadEye.ViewCS
         }
 
 
-
         /// <summary>
         /// 폴더, 파일 열기
         /// </summary>
@@ -614,7 +608,7 @@ namespace CadEye.ViewCS
             try
             {
                 var child_db = DatabaseProvider.Child_Node;
-                var item = child_db.FindOne(x => x.File_Name == selectedItem);
+                var item = child_db.FindOne(x => x.File_Path == selectedItem);
 
                 if (item == null)
                 {
@@ -654,7 +648,7 @@ namespace CadEye.ViewCS
             try
             {
                 var child_db = DatabaseProvider.Child_Node;
-                var item = child_db.FindOne(x => x.File_Name == selectedItem);
+                var item = child_db.FindOne(x => x.File_Path == selectedItem);
 
                 if (item == null)
                 {
@@ -691,9 +685,6 @@ namespace CadEye.ViewCS
             }
         }
 
-
-
-
         /// <summary>
         /// 파일 와처로 인한 히스토리 뷰
         /// </summary>
@@ -703,7 +694,7 @@ namespace CadEye.ViewCS
             try
             {
                 var child_db = DatabaseProvider.Child_Node;
-                var file_nodes = child_db.FindOne(x => x.File_Name == selectedItem);
+                var file_nodes = child_db.FindOne(x => x.File_Path == selectedItem);
                 if (file_nodes == null) { return; }
                 if (file_nodes != null)
                 {
@@ -723,9 +714,6 @@ namespace CadEye.ViewCS
                 Debug.WriteLine($"Data_View : {ex.Message}");
             }
         }
-
-
-
 
         /// <summary>
         /// 2개의 PDF 비교 기능
@@ -751,7 +739,6 @@ namespace CadEye.ViewCS
                 Debug.WriteLine($"Pdf_Compare : {ex.Message}");
             }
         }
-
         public WindowsFormsHost new_host2 = new WindowsFormsHost();
         public void Pdf_Compare_Reuslt(byte[] annotatedPdfBytes)
         {
@@ -780,22 +767,22 @@ namespace CadEye.ViewCS
             await Task.Run(() => Pdf_Compare());
         }
 
-
-
-
         /// <summary>
         /// 접근 실패 재시도 함수
         /// </summary>
 
-        public bool Read_Respone(string path, string point)
+        public bool Read_Respone(string path, string point, string eventname = null)
         {
-            int retry = 120;
+            int retry = 100;
             while (retry-- > 0)
             {
-                if (System.IO.Path.GetExtension(path).ToUpper() != ".DWG" && System.IO.Path.GetExtension(path).ToUpper() != ".DWF")
+                if (eventname == "Deleted")
                 {
                     return false;
                 }
+
+                bool check_ext = FilterExt(path);
+                if (!check_ext) return false;
 
                 if (File.Exists(path))
                 {
@@ -809,18 +796,33 @@ namespace CadEye.ViewCS
                     catch (IOException) { }
                 }
 
-                Thread.Sleep(500);
+                Thread.Sleep(100);
                 Debug.WriteLine($"[{point}] 파일 접근 실패, 남은 시도: {retry}");
             }
 
             Debug.WriteLine($"[{point}] 최종 실패: 파일 접근 불가");
             return false;
         }
+        public bool FilterExt(string path)
+        {
+            if (path.Contains(".log"))
+                return false;
+
+            if (path.Contains(".pdf"))
+                return false;
+
+            if (System.IO.Path.GetExtension(path) == "")
+                return false;
+
+            if (System.IO.Path.GetExtension(path).ToUpper() != ".DWG" && System.IO.Path.GetExtension(path).ToUpper() != ".DWF")
+                return false;
+
+            return true;
+        }
 
         /// <summary>
         /// watcher
         /// </summary>
-
         File_Watcher watcher = new File_Watcher();
         public FileSystemWatcher _watcher;
         public FileSystemWatcher _watcher2;

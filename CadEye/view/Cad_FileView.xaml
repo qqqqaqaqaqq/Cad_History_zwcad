@@ -81,7 +81,7 @@
                             Width="30"/>
                         <DataGridTextColumn 
                             Header="Event" 
-                            Binding="{Binding FileName}" 
+                            Binding="{Binding FilePath}" 
                             ElementStyle ="{StaticResource Data_ElementStyle}"
                             Width="*"/>
                     </DataGrid.Columns>

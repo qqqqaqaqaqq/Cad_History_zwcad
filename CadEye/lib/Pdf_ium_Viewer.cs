@@ -11,13 +11,12 @@ namespace CadEye.Lib
 {
     public class Pdf_ium_Viewer
     {
+
         public byte[] RenderPdfPage(string path)
         {
-            return File.ReadAllBytes(path);
+            byte[] resource = File.ReadAllBytes(path);
+            return resource;
         }
-
-
-
         private MemoryStream _pdfStream;
         private PdfRenderer _pdfRenderer;
         public WindowsFormsHost Pdf_Created(byte[] pdfBytes)
@@ -41,10 +40,6 @@ namespace CadEye.Lib
             host.Child = _pdfRenderer;
             return host;
         }
-
-
-
-
         private const int RenderWidth = 2000;
         public List<Point> GetDifferences(byte[] targetBytes, byte[] sourceBytes)
         {
@@ -74,10 +69,8 @@ namespace CadEye.Lib
                 }
             }
         }
-
         public int AnnotatedBitmapWidth { get; private set; }
         public int AnnotatedBitmapHeight { get; private set; }
-
         public List<Point> CompareBitmaps(Bitmap bmp1, Bitmap bmp2)
         {
             var differences = new List<Point>();
@@ -95,7 +88,6 @@ namespace CadEye.Lib
             }
             return differences;
         }
-
         public byte[] AnnotatePdf(byte[] originalPdfBytes, List<Point> differences, int bitmapWidth, int bitmapHeight)
         {
             using (var inputStream = new MemoryStream(originalPdfBytes))
