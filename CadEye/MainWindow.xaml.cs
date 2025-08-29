@@ -2,10 +2,8 @@
 using CadEye.View;
 using CadEye.ViewCS;
 using System;
-using System.Diagnostics;
 using System.IO;
 using System.Threading;
-using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
@@ -18,7 +16,6 @@ namespace CadEye
     public partial class MainWindow : Window
     {
         public Bridge vm { get; set; }
-
         public MainWindow()
         {
             InitializeComponent();
@@ -81,6 +78,8 @@ namespace CadEye
                 {
                     isManger = false;
                     Cad_FileView1.Unvisible_btn();
+                    Authority.Visibility = Visibility.Hidden;
+                    Autobutton.Visibility = Visibility.Hidden;
                 }
             }
             catch (Exception ex)
@@ -104,17 +103,23 @@ namespace CadEye
             else
             { return; }
         }
-
         private void Mainbutton_Click(object sender, RoutedEventArgs e)
         {
             Main.Visibility = Visibility.Visible;
             Home.Visibility = Visibility.Hidden;
+            Authority.Visibility = Visibility.Hidden;
         }
-
         private void Homebutton_Click(object sender, RoutedEventArgs e)
         {
             Main.Visibility = Visibility.Hidden;
             Home.Visibility = Visibility.Visible;
+            Authority.Visibility = Visibility.Hidden;
+        }
+        private void Authority_Click(object sender, RoutedEventArgs e)
+        {
+            Main.Visibility = Visibility.Hidden;
+            Home.Visibility = Visibility.Hidden;
+            Authority.Visibility = Visibility.Visible;
         }
     }
 }

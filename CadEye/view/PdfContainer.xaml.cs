@@ -4,6 +4,7 @@ using System.Windows.Forms.Integration;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Diagnostics;
 
 namespace CadEye.View
 {
@@ -25,11 +26,18 @@ namespace CadEye.View
         WindowsFormsHost allhost;
         public void SetHost(WindowsFormsHost host)
         {
-            Application.Current.Dispatcher.Invoke(() =>
+            try
             {
-                Pdf_Grid.Children.Add(host);
-            });
-            allhost = host;
+                Application.Current.Dispatcher.Invoke(() =>
+                {
+                    Pdf_Grid.Children.Add(host);
+                });
+                allhost = host;
+            }
+            catch
+            {
+                Debug.WriteLine("SetHost : Error");
+            }
         }
         public void ResetHost()
         {

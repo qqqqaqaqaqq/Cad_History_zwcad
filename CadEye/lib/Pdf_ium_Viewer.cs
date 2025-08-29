@@ -14,31 +14,47 @@ namespace CadEye.Lib
 
         public byte[] RenderPdfPage(string path)
         {
-            byte[] resource = File.ReadAllBytes(path);
-            return resource;
+            try
+            {
+                byte[] resource = File.ReadAllBytes(path);
+                return resource;
+            }
+            catch
+            {
+                Debug.WriteLine($"RenderPdfPage : Error");
+                return null;
+            }
         }
         private MemoryStream _pdfStream;
         private PdfRenderer _pdfRenderer;
         public WindowsFormsHost Pdf_Created(byte[] pdfBytes)
         {
-            var host = new WindowsFormsHost
+            try
             {
-                HorizontalAlignment = System.Windows.HorizontalAlignment.Stretch,
-                VerticalAlignment = System.Windows.VerticalAlignment.Stretch,
-                Background = System.Windows.Media.Brushes.Transparent,
-            };
+                var host = new WindowsFormsHost
+                {
+                    HorizontalAlignment = System.Windows.HorizontalAlignment.Stretch,
+                    VerticalAlignment = System.Windows.VerticalAlignment.Stretch,
+                    Background = System.Windows.Media.Brushes.Transparent,
+                };
 
-            _pdfRenderer = new PdfRenderer
+                _pdfRenderer = new PdfRenderer
+                {
+                    Dock = System.Windows.Forms.DockStyle.Fill
+                };
+
+                _pdfStream = new MemoryStream(pdfBytes);
+                var pdfDocument = PdfiumViewer.PdfDocument.Load(_pdfStream);
+                _pdfRenderer.Load(pdfDocument);
+
+                host.Child = _pdfRenderer;
+                return host;
+            }
+            catch
             {
-                Dock = System.Windows.Forms.DockStyle.Fill
-            };
-
-            _pdfStream = new MemoryStream(pdfBytes);
-            var pdfDocument = PdfiumViewer.PdfDocument.Load(_pdfStream);
-            _pdfRenderer.Load(pdfDocument);
-
-            host.Child = _pdfRenderer;
-            return host;
+                Debug.WriteLine($"Pdf_Created : Error");
+                return null;
+            }
         }
         private const int RenderWidth = 2000;
         public List<Point> GetDifferences(byte[] targetBytes, byte[] sourceBytes)

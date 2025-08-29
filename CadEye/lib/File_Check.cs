@@ -83,7 +83,7 @@ namespace CadEye.Lib
                 {
                     try
                     {
-                        using (var stream = new FileStream(fullName, FileMode.Open, FileAccess.Read, FileShare.Read))
+                        using (var stream = new FileStream(fullName, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
                         using (var sha = SHA256.Create())
                         {
                             contentHash = sha.ComputeHash(stream);

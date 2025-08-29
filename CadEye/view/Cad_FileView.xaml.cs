@@ -26,14 +26,26 @@ namespace CadEye.View
         }
         public async void File_List_Selecetd(object sender, SelectedCellsChangedEventArgs e)
         {
-            if (Child_Box.SelectedItem is FileInfoItem selected)
+            try
             {
-                string filenameOnly = selected.FilePath;
-                vm.selectedItem = filenameOnly;
-                vm.File_Description();
-                await vm.Pdf_Load_btn();
-                vm.Data_View();
+                if (Child_Box.SelectedItem is FileInfoItem selected)
+                {
+                    string filenameOnly = selected.FilePath;
+                    vm.selectedItem = filenameOnly;
+                    vm.File_Description();
+                    await vm.Pdf_Load_btn();
+                    vm.Data_View();
+
+                    string result = $"File_List_Selecetd Succed";
+                    vm.Event_History_Add(result);
+                }
             }
+            catch
+            {
+                string result = $"File_List_Selecetd Failed";
+                vm.Event_History_Add(result);
+            }
+
         }
         public async void FolderSearch_btn(object sender, RoutedEventArgs e)
         {
@@ -90,29 +102,44 @@ namespace CadEye.View
         }
         private async void DB_Update(object sender, RoutedEventArgs e)
         {
-            Overlay.Visibility = Visibility.Visible;
-            await Task.Run(() => vm.MainView_Start_Load());
-            vm.File_input_Event();
+            try
+            {
+                Overlay.Visibility = Visibility.Visible;
+                await Task.Run(() => vm.MainView_Start_Load());
+                vm.File_input_Event();
 
-            DateTime time = new DateTime(
-                DateTime.Now.Year,
-                DateTime.Now.Month,
-                DateTime.Now.Day,
-                DateTime.Now.Hour,
-                DateTime.Now.Minute,
-                DateTime.Now.Second);
+                DateTime time = new DateTime(
+                    DateTime.Now.Year,
+                    DateTime.Now.Month,
+                    DateTime.Now.Day,
+                    DateTime.Now.Hour,
+                    DateTime.Now.Minute,
+                    DateTime.Now.Second);
+                await vm.Extrude_btn(time);
+                Overlay.Visibility = Visibility.Hidden;
 
-            await vm.Extrude_btn(time);
-            await vm.Pdf_Bitmap_btn(time);
-
-            Overlay.Visibility = Visibility.Hidden;
+                string result = $"DB_Update Succed";
+                vm.Event_History_Add(result);
+            }
+            catch
+            {
+                string result = $"DB_Update Failed";
+                vm.Event_History_Add(result);
+            }
         }
+
+        public int isinitial = 0;
         public async void Tree_Update(object sender, RoutedEventArgs e)
         {
             Overlay.Visibility = Visibility.Visible;
-            await Task.Run(() => vm.MainView_Start_Load());
+
+            if (isinitial == 0) // hash 코드기반으로 수정 하는도중 버튼 누를시 새로생성됨 초기만 진행 
+            {
+                await Task.Run(() => vm.MainView_Start_Load());
+            }
             vm.File_input_Event();
             Overlay.Visibility = Visibility.Hidden;
+            isinitial = 1;
         }
         public void DB_Read(object sender, RoutedEventArgs e)
         {

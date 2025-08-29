@@ -53,7 +53,7 @@ namespace CadEye.Lib
                 if (source_list.Count() > 0)
                 {
                     isCollecting = true;
-                    await Task.Delay(300);
+                    await Task.Delay(1000);
 
                     List<(FileSystemEventArgs, string, DateTime)> target_list =
                         new List<(FileSystemEventArgs, string, DateTime)>();
@@ -119,6 +119,8 @@ namespace CadEye.Lib
                             File_B(e, time);
                             break;
                     }
+                    Debug.WriteLine($"{e.FullPath} Clear");
+                    Thread.Sleep(200);
                 }
                 else
                 {
@@ -158,7 +160,7 @@ namespace CadEye.Lib
                         Key = source_node.Key,
                         Time = time,
                         Type = Event,
-                        Description = $"삭제 : {relativefilename}"
+                        Description = $"Deleted : {relativefilename}"
                     });
 
 
@@ -174,6 +176,11 @@ namespace CadEye.Lib
 
                     _db.Child_File_Table(source_node, null, DbAction.Update);
                     vm.File_input_Event();
+                    Thread.Sleep(200);
+
+                    string result = $"File_A Deleted Succed, {e.FullPath}";
+                    vm.Event_History_Add(result);
+
                     return;
                 }
                 else
@@ -212,8 +219,13 @@ namespace CadEye.Lib
                             Event = "Created";
 
                             _db.Child_File_Table(source_node, null, DbAction.Insert);
-                            File_Copy(e, time, key, Event);
+                            File_Copy(e.FullPath, time, key, Event);
                             vm.File_input_Event();
+
+                            string result = $"File_A Created Succed, {e.FullPath}";
+                            vm.Event_History_Add(result);
+
+                            return;
                         }
                         else
                         {
@@ -241,7 +253,7 @@ namespace CadEye.Lib
                                     Key = source_node.Key,
                                     Time = time,
                                     Type = Event,
-                                    Description = $"위치 : {relativefilename}",
+                                    Description = $"Origin Address : {relativefilename}",
                                 });
 
 
@@ -257,6 +269,10 @@ namespace CadEye.Lib
 
                                 _db.Child_File_Table(source_node, null, DbAction.Upsert);
                                 vm.File_input_Event();
+
+                                string result = $"File_A Moved Succed, {e.FullPath}";
+                                vm.Event_History_Add(result);
+
                                 return;
                             }
                             else
@@ -266,7 +282,6 @@ namespace CadEye.Lib
                                 var relative = Path.GetFileName(foldername);
                                 var relativefilename = Path.Combine(relative, Path.GetFileName(target_node_hash.File_Path));
 
-                                // Created
                                 var allkeys = child_node.FindAll().Select(x => x.Key);
                                 key = allkeys.Any() ? allkeys.Max() + 1 : 1;
 
@@ -276,8 +291,8 @@ namespace CadEye.Lib
                                 source_node.HashToken = has;
                                 source_node.list = target_node_hash.list;
                                 source_node.Feature = target_node_hash.Feature;
-                                source_node.Event = target_node_hash.Event;
-                                source_node.Image = target_node_hash.Image;
+                                source_node.Event = new List<EventEntry>();
+                                source_node.Image = new List<ImageEntry>();
                                 source_node.Detele_Check = 0;
                                 Event = "Copyed";
 
@@ -286,22 +301,16 @@ namespace CadEye.Lib
                                     Key = source_node.Key,
                                     Time = time,
                                     Type = Event,
-                                    Description = $"원본 : {relativefilename}"
+                                    Description = $"Origin File : {relativefilename}"
                                 });
 
-
-                                if (source_node.Image.Count() > 0)
-                                {
-                                    source_node.Image.Add(new ImageEntry()
-                                    {
-                                        Key = source_node.Key,
-                                        Time = time,
-                                        Data = target_node_hash.Image[target_node_hash.Image.Count() - 1].Data,
-                                    });
-                                }
-
                                 _db.Child_File_Table(source_node, null, DbAction.Upsert);
+                                File_Copy(e.FullPath, time, key, Event);
                                 vm.File_input_Event();
+
+                                string result = $"File_A Copyed Succed, {e.FullPath}";
+                                vm.Event_History_Add(result);
+
                                 return;
                             }
                         }
@@ -328,7 +337,7 @@ namespace CadEye.Lib
                                 Key = source_node.Key,
                                 Time = time,
                                 Type = Event,
-                                Description = "복원"
+                                Description = "Restore Completed"
                             });
 
 
@@ -344,11 +353,18 @@ namespace CadEye.Lib
 
                             _db.Child_File_Table(source_node, null, DbAction.Update);
                             vm.File_input_Event();
+
+                            string result = $"File_A Restore Succed, {e.FullPath}";
+                            vm.Event_History_Add(result);
+
                             return;
                         }
                         else
                         {
-                            if (target_node.HashToken.SequenceEqual(has))
+                            // No Changed
+                            var all_nodes = child_node.FindAll();
+                            var target_node_hash = all_nodes.FirstOrDefault(x => x.HashToken.SequenceEqual(has));
+                            if (target_node_hash != null)
                             {
                                 key = target_node.Key;
                                 source_node.Key = key;
@@ -367,7 +383,7 @@ namespace CadEye.Lib
                                     Key = source_node.Key,
                                     Time = time,
                                     Type = Event,
-                                    Description = "내용이 안변했습니다"
+                                    Description = "HashToken matches"
                                 });
 
 
@@ -383,6 +399,11 @@ namespace CadEye.Lib
 
                                 _db.Child_File_Table(source_node, null, DbAction.Update);
                                 vm.File_input_Event();
+
+
+                                string result = $"File_A No-Changed Succed, {e.FullPath}";
+                                vm.Event_History_Add(result);
+
                                 return;
                             }
                             else
@@ -399,19 +420,26 @@ namespace CadEye.Lib
                                 source_node.Image = target_node.Image;
                                 source_node.Detele_Check = 0;
                                 Event = "Changed";
+
+                                _db.Child_File_Table(source_node, null, DbAction.Update);
+                                File_Copy(e.FullPath, time, key, Event);
+                                vm.File_input_Event();
+
+                                string result = $"File_A Changed Succed, {e.FullPath}";
+                                vm.Event_History_Add(result);
+
+                                return;
                             }
                         }
-                        _db.Child_File_Table(source_node, null, DbAction.Upsert);
-                        File_Copy(e, time, key, Event);
-                        vm.File_input_Event();
                     }
                 }
-
-                Debug.WriteLine($"File_A Result = true");
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                Debug.WriteLine($"File_A Result = false, {ex.Message}");
+                string result = $"File_A Failed, {e.FullPath}";
+                vm.Event_History_Add(result);
+
+                return;
             }
         }
         private void File_B(FileSystemEventArgs e, DateTime time)
@@ -419,7 +447,13 @@ namespace CadEye.Lib
             try
             {
                 bool read_chk = vm.Read_Respone(e.FullPath, "File_B");
-                if (!read_chk) { return; }
+                if (!read_chk)
+                {
+                    string result = $"Renamed Result Filed : {e.FullPath}";
+                    vm.Event_History_Add(result);
+
+                    return;
+                }
                 else
                 {
                     var re = e as RenamedEventArgs;
@@ -459,12 +493,18 @@ namespace CadEye.Lib
                     }
 
                     bool check = _db.Child_File_Table(source_node, null, DbAction.Upsert);
+
+                    string result = $"Renamed Result Succed : {e.FullPath}";
+                    vm.Event_History_Add(result);
+
                     vm.File_input_Event();
                 }
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                Debug.WriteLine($"File_B Result = false, {ex.Message}");
+                string result = $"Renamed Result Failed, {e.FullPath}";
+                vm.Event_History_Add(result);
+
             }
         }
         private void SafeFileCopy(string sourcePath, string destPath, int retries = 5, int delayMs = 500)
@@ -483,15 +523,22 @@ namespace CadEye.Lib
             }
             throw new IOException($"파일 복사 실패: {sourcePath}");
         }
-        private void File_Copy(FileSystemEventArgs e, DateTime time, long key, string Event)
+        public void File_Copy(string fullpath, DateTime time, long key, string Event)
         {
             try
             {
-                bool read_chk = vm.Read_Respone(e.FullPath, "File_Copy");
-                if (!read_chk) { return; }
+                string result = "";
+                bool read_chk = vm.Read_Respone(fullpath, "File_Copy");
+                if (!read_chk)
+                {
+                    result = $"File Copy Failed  : {fullpath}";
+                    vm.Event_History_Add(result);
+
+                    return;
+                }
                 else
                 {
-                    var source_file = e.FullPath;
+                    var source_file = fullpath;
                     string baseDir = AppDomain.CurrentDomain.BaseDirectory;
                     string target_folder = Path.Combine(baseDir, $"repository\\{Bridge.projectname}");
                     if (!Directory.Exists(target_folder))
@@ -520,11 +567,16 @@ namespace CadEye.Lib
                         }
                     }
                 }
-                Debug.WriteLine($"복사 성공 : {e.FullPath}");
+
+                result = $"File Copy Succed  : {fullpath}";
+                vm.Event_History_Add(result);
+
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                Debug.WriteLine($"File_Copy : {ex.Message}");
+                string result = $"File Copy Failed : {fullpath}";
+                vm.Event_History_Add(result);
+
             }
         }
         // --------------------------------------------------------------------------------- 저장소에 대한 감시
@@ -565,8 +617,10 @@ namespace CadEye.Lib
         {
             try
             {
+                string result = "";
                 bool read_chk = vm.Read_Respone(e.FullPath, "Repository");
-                if (!read_chk) { return; }
+                if (!read_chk) {
+                    return; }
                 {
                     (DateTime, string, long) name_parts = file_name_parsing(e);
 
@@ -575,6 +629,9 @@ namespace CadEye.Lib
 
                     if (target_node == null)
                     {
+                        result = $"Repository Failed  : {e.FullPath}";
+                        vm.Event_History_Add(result);
+
                         return;
                     }
 
@@ -614,11 +671,13 @@ namespace CadEye.Lib
                         bool check = _db.Child_File_Table(source_node, null, DbAction.Update);
                     }
                 }
-                Debug.WriteLine($"Repository Result = true");
+                result = $"Repository Succed : {e.FullPath}";
+                vm.Event_History_Add(result);
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"Repository Result = false, {ex.Message}");
+                string result = $"Repository Failed : {e.FullPath}";
+                vm.Event_History_Add(result);
             }
         }
         private (DateTime, string, long) file_name_parsing(FileSystemEventArgs e)

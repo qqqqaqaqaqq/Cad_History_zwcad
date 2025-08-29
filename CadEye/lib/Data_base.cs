@@ -38,9 +38,6 @@ namespace CadEye.Lib
             _instance = null;
         }
     }
-
-
-
     public class ImageEntry
     {
         public long Key { get; set; }

@@ -1,5 +1,6 @@
 ﻿using CadEye.Lib;
 using CadEye.View;
+using LiteDB;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -21,6 +22,10 @@ namespace CadEye.ViewCS
         public string FilePath { get; set; }
     }
 
+    public class Event_History_Author
+    {
+        public string Event_Messages { get; set; }
+    }
     public class Bridge
     {
         private static Bridge _instance;
@@ -99,30 +104,40 @@ namespace CadEye.ViewCS
                 if (!MainWindow.isManger)
                 {
                     bool check = ReadMode();
-                    if (!check) { return; }
+                    if (!check) return;
                 }
-                var fileInfos = await Task.Run(() =>
-                 {
-                     var child_db = DatabaseProvider.Child_Node;
-                     var child_nodes = child_db.FindAll();
-                     var files = child_nodes
-                         .Select(node => new FileInfoItem
-                         {
-                             Key = node.Key,
-                             FilePath = node.File_Path
-                         })
-                         .ToList();
-                     return files;
-                 });
 
+                var fileInfos = await Task.Run(() =>
+                {
+                    try
+                    {
+                        var child_db = DatabaseProvider.Child_Node;
+                        var child_nodes = child_db.FindAll();
+
+                        return child_nodes
+                            .Select(node => new FileInfoItem
+                            {
+                                Key = node.Key,
+                                FilePath = node.File_Path
+                            })
+                            .ToList();
+                    }
+                    catch (LiteDB.LiteException ex)
+                    {
+                        Debug.WriteLine($"[FILE_INPUT ERROR] {ex.Message}");
+                        return new List<FileInfoItem>();
+                    }
+                });
+
+                // UI 업데이트
                 System.Windows.Application.Current.Dispatcher.Invoke(() =>
-                 {
-                     Files.Clear();
-                     foreach (var file in fileInfos)
-                     {
-                         Files.Add(file);
-                     }
-                 });
+                {
+                    Files.Clear();
+                    foreach (var file in fileInfos)
+                    {
+                        Files.Add(file);
+                    }
+                });
             }
             catch (Exception ex)
             {
@@ -144,45 +159,89 @@ namespace CadEye.ViewCS
         {
             Random random = new Random();
             string exePath = AppDomain.CurrentDomain.BaseDirectory;
-            string sourceFile = System.IO.Path.Combine(exePath, $"{projectname}-log.db");
 
-            for (int num = 0; num < 100; num++)
+            string sourceDbFile = Path.Combine(exePath, $"{projectname}.db");
+            string sourceLogFile = Path.Combine(exePath, $"{projectname}-log.db");
+
+            for (int attempt = 0; attempt < 100; attempt++)
             {
                 try
                 {
-
+                    // 기존 DB 닫기
                     DatabaseProvider.Dispose();
-                    if (user_file != null)
-                    {
-                        DeleteFileSafely(user_file);
-                        DeleteFileSafely(user_log);
-                    }
-                    string targetFile = "";
-                    string targetFileName = "";
-                    string targetlogFile = "";
+                    Thread.Sleep(50); // OS 잠금 해제 대기
+
+                    // 기존 복사본 삭제
+                    if (!string.IsNullOrEmpty(user_file)) DeleteFileSafely(user_file);
+                    if (!string.IsNullOrEmpty(user_log)) DeleteFileSafely(user_log);
 
                     int rnd = random.Next(1000);
-                    targetFileName = $"{projectname}_{rnd}";
-                    targetFile = System.IO.Path.Combine(exePath, $"{targetFileName}.db");
-                    targetlogFile = System.IO.Path.Combine(exePath, $"{targetFileName}-log.db");
-                    File.Copy(sourceFile, targetlogFile, true);
-                    DatabaseProvider.Initialize(false, targetFileName);
-                    user_file = targetFile;
-                    user_log = targetlogFile;
+                    string targetFileName = $"{projectname}_{rnd}";
+                    string targetDbFile = Path.Combine(exePath, $"{targetFileName}.db");
+                    string targetLogFile = Path.Combine(exePath, $"{targetFileName}-log.db");
 
-                    return true;
-                }
-                catch (IOException ioEx)
-                {
-                    Debug.WriteLine($"[READ MODE COPY ERROR] {ioEx.Message}");
+                    // 안전하게 DB 파일 복사
+                    const int retries = 5;
+                    bool copySuccess = false;
+                    for (int i = 0; i < retries; i++)
+                    {
+                        try
+                        {
+                            using (var src = new FileStream(sourceDbFile, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                            using (var dest = new FileStream(targetDbFile, FileMode.Create, FileAccess.Write, FileShare.None))
+                            {
+                                src.CopyTo(dest);
+                            }
+
+                            using (var srcLog = new FileStream(sourceLogFile, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                            using (var destLog = new FileStream(targetLogFile, FileMode.Create, FileAccess.Write, FileShare.None))
+                            {
+                                srcLog.CopyTo(destLog);
+                            }
+
+                            copySuccess = true;
+                            break;
+                        }
+                        catch (IOException)
+                        {
+                            Thread.Sleep(50); // 잠금 대기 후 재시도
+                        }
+                    }
+
+                    if (!copySuccess)
+                    {
+                        Debug.WriteLine("[READ MODE COPY ERROR] Failed after retries.");
+                        continue;
+                    }
+
+                    // DB 초기화
+                    DatabaseProvider.Initialize(false, targetFileName);
+                    user_file = targetDbFile;
+                    user_log = targetLogFile;
+                    Thread.Sleep(100); // DB 초기화 안정화
+
+                    // 안전 검사
+                    try
+                    {
+                        var test = DatabaseProvider.Child_Node.FindOne(Query.All());
+                    }
+                    catch (LiteDB.LiteException ex)
+                    {
+                        Debug.WriteLine($"[READ MODE SAFETY CHECK FAILED] {ex.Message}");
+                        continue;
+                    }
+
+                    return true; // 성공
                 }
                 catch (Exception ex)
                 {
                     Debug.WriteLine($"[READ MODE ERROR] {ex.Message}");
                 }
             }
-            return false;
+
+            return false; // 모든 시도 실패
         }
+
         private void DeleteFileSafely(string path)
         {
             if (!File.Exists(path))
@@ -227,30 +286,24 @@ namespace CadEye.ViewCS
                 return source_node;
             }
         }
+        // 안전하게 File_wather 통해서 처리
         private void Extrude(DateTime time)
         {
             try
             {
                 var child_db = DatabaseProvider.Child_Node;
                 var child_nodes = child_db.FindAll().Select(x => x.File_Path);
+
                 if (child_nodes == null) { return; }
                 foreach (string path in child_nodes)
                 {
                     var node = child_db.FindOne(x => x.File_Path == path);
                     if (!File.Exists(node.File_Path)) { continue; }
 
-                    var file = new FileInfo(node.File_Path);
-                    var source_node = Extrude_Indiviaul(node, node.File_Path);
-
-                    source_node.Event.Add(new EventEntry()
-                    {
-                        Key = source_node.Key,
-                        Time = time,
-                        Type = "Created",
-                        Description = "기존 파일"
-                    });
-
-                    _db.Child_File_Table(source_node, null, DbAction.Upsert);
+                    string sourcefile = node.File_Path;
+                    string targetfile = node.File_Path;
+                    string Event = "First Created";
+                    watcher.File_Copy(node.File_Path, time, node.Key, Event);
                 }
             }
             catch (Exception ex)
@@ -869,6 +922,16 @@ namespace CadEye.ViewCS
             };
             _watcher2.InternalBufferSize = 64 * 1024;
             watcher.SetupWatcher_repository(_watcher2);
+        }
+
+        public ObservableCollection<string> Event_History { get; set; } = new ObservableCollection<string>();
+
+        public void Event_History_Add(string evt)
+        {
+            Application.Current.Dispatcher.Invoke(() =>
+            {
+                Event_History.Add(evt);
+            });
         }
     }
 }

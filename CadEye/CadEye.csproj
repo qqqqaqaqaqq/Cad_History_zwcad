@@ -199,20 +199,23 @@
       <SubType>Designer</SubType>
     </ApplicationDefinition>
     <Compile Include="lib\File_Watcher.cs" />
-    <Compile Include="viewcs\Bridge.cs" />
-    <Compile Include="view\Cad_FileView.xaml.cs">
+    <Compile Include="ViewCs\Bridge.cs" />
+    <Compile Include="View\AuthorityPage.xaml.cs">
+      <DependentUpon>AuthorityPage.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="View\Cad_FileView.xaml.cs">
       <DependentUpon>Cad_FileView.xaml</DependentUpon>
     </Compile>
-    <Compile Include="view\Cad_Text.xaml.cs">
+    <Compile Include="View\Cad_Text.xaml.cs">
       <DependentUpon>Cad_Text.xaml</DependentUpon>
     </Compile>
-    <Compile Include="view\File_Watcher_View.xaml.cs">
+    <Compile Include="View\File_Watcher_View.xaml.cs">
       <DependentUpon>File_Watcher_View.xaml</DependentUpon>
     </Compile>
-    <Compile Include="view\PdfContainer.xaml.cs">
+    <Compile Include="View\PdfContainer.xaml.cs">
       <DependentUpon>PdfContainer.xaml</DependentUpon>
     </Compile>
-    <Compile Include="view\PdfContainer2.xaml.cs">
+    <Compile Include="View\PdfContainer2.xaml.cs">
       <DependentUpon>PdfContainer2.xaml</DependentUpon>
     </Compile>
     <Page Include="MainWindow.xaml">
@@ -237,23 +240,27 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </Page>
-    <Page Include="view\Cad_FileView.xaml">
+    <Page Include="View\AuthorityPage.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="View\Cad_FileView.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </Page>
-    <Page Include="view\Cad_Text.xaml">
+    <Page Include="View\Cad_Text.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </Page>
-    <Page Include="view\File_Watcher_View.xaml">
+    <Page Include="View\File_Watcher_View.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </Page>
-    <Page Include="view\PdfContainer.xaml">
+    <Page Include="View\PdfContainer.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </Page>
-    <Page Include="view\PdfContainer2.xaml">
+    <Page Include="View\PdfContainer2.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </Page>

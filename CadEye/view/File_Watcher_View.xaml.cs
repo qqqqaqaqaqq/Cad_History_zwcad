@@ -19,8 +19,6 @@ namespace CadEye.View
             vm = Bridge.Instance;
             this.DataContext = vm;
         }
-
-
         private void Grid_Cell_Selected(object sender, SelectedCellsChangedEventArgs e)
         {
             if (FildData_Grid.SelectedItem is EventEntry selected)
