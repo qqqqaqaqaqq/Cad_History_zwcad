@@ -227,7 +227,7 @@ namespace CadEye.ViewCS
                 return source_node;
             }
         }
-        private void Extrude()
+        private void Extrude(DateTime time)
         {
             try
             {
@@ -240,17 +240,12 @@ namespace CadEye.ViewCS
                     if (!File.Exists(node.File_Path)) { continue; }
 
                     var file = new FileInfo(node.File_Path);
-                    DateTime lastWriteTime = file.LastWriteTime;
-                    lastWriteTime = lastWriteTime.AddTicks(-(lastWriteTime.Ticks % TimeSpan.TicksPerSecond));
-                    if (node.Image.Count != 0)
-                    { if (node.Image[node.Image.Count - 1].Time == lastWriteTime) { continue; } }
-
-
                     var source_node = Extrude_Indiviaul(node, node.File_Path);
 
                     source_node.Event.Add(new EventEntry()
                     {
-                        Time = lastWriteTime,
+                        Key = source_node.Key,
+                        Time = time,
                         Type = "Created",
                         Description = "기존 파일"
                     });
@@ -263,9 +258,9 @@ namespace CadEye.ViewCS
                 Debug.WriteLine($"Extrude : {ex.Message}");
             }
         }
-        public async Task Extrude_btn()
+        public async Task Extrude_btn(DateTime time)
         {
-            await Task.Run(() => Extrude());
+            await Task.Run(() => Extrude(time));
         }
 
         /// <summary>
@@ -337,7 +332,7 @@ namespace CadEye.ViewCS
                 else { return null; }
             }
         }
-        private void Pdf_Bitmap()
+        private void Pdf_Bitmap(DateTime time)
         {
             try
             {
@@ -349,13 +344,7 @@ namespace CadEye.ViewCS
                     var node = child_db.FindOne(x => x.File_Path == path);
                     if (!File.Exists(path)) { continue; }
                     var file = new FileInfo(path);
-                    DateTime lastWriteTime = file.LastWriteTime;
-                    lastWriteTime = lastWriteTime.AddTicks(-(lastWriteTime.Ticks % TimeSpan.TicksPerSecond));
-                    if (node.Image.Count != 0)
-                    {
-                        if (node.Image[node.Image.Count - 1].Time == lastWriteTime) { continue; }
-                    }
-                    var source_node = Pdf_Bitmap_Indiviaul(lastWriteTime, node, node.File_Path);
+                    var source_node = Pdf_Bitmap_Indiviaul(time, node, node.File_Path);
 
                     _db.Child_File_Table(source_node, null, DbAction.Upsert);
                 }
@@ -365,9 +354,9 @@ namespace CadEye.ViewCS
                 Debug.WriteLine($"Pdf_Bitmap : {ex.Message}");
             }
         }
-        public async Task Pdf_Bitmap_btn()
+        public async Task Pdf_Bitmap_btn(DateTime time)
         {
-            await Task.Run(() => Pdf_Bitmap());
+            await Task.Run(() => Pdf_Bitmap(time));
         }
 
         /// <summary>
@@ -609,6 +598,13 @@ namespace CadEye.ViewCS
             {
                 Directory.Delete(folder, true);
             }
+            Application.Current.Dispatcher.Invoke(() =>
+            {
+                host = new WindowsFormsHost();
+                host2 = new WindowsFormsHost();
+                pdfpage.ResetHost();
+                pdfpage2.ResetHost();
+            });
         }
 
 

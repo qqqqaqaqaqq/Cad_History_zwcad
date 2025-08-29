@@ -1,4 +1,5 @@
 ﻿using CadEye.ViewCS;
+using System;
 using System.Diagnostics;
 using System.Threading.Tasks;
 using System.Windows;
@@ -92,8 +93,17 @@ namespace CadEye.View
             Overlay.Visibility = Visibility.Visible;
             await Task.Run(() => vm.MainView_Start_Load());
             vm.File_input_Event();
-            await vm.Extrude_btn();
-            await vm.Pdf_Bitmap_btn();
+
+            DateTime time = new DateTime(
+                DateTime.Now.Year,
+                DateTime.Now.Month,
+                DateTime.Now.Day,
+                DateTime.Now.Hour,
+                DateTime.Now.Minute,
+                DateTime.Now.Second);
+
+            await vm.Extrude_btn(time);
+            await vm.Pdf_Bitmap_btn(time);
 
             Overlay.Visibility = Visibility.Hidden;
         }

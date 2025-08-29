@@ -104,5 +104,17 @@ namespace CadEye
             else
             { return; }
         }
+
+        private void Mainbutton_Click(object sender, RoutedEventArgs e)
+        {
+            Main.Visibility = Visibility.Visible;
+            Home.Visibility = Visibility.Hidden;
+        }
+
+        private void Homebutton_Click(object sender, RoutedEventArgs e)
+        {
+            Main.Visibility = Visibility.Hidden;
+            Home.Visibility = Visibility.Visible;
+        }
     }
 }

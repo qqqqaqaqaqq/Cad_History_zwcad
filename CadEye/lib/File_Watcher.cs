@@ -150,6 +150,7 @@ namespace CadEye.Lib
                     source_node.Feature = target_node.Feature;
                     source_node.Event = target_node.Event;
                     source_node.Image = target_node.Image;
+                    source_node.Detele_Check = 1;
                     string Event = "Deleted";
 
                     source_node.Event.Add(new EventEntry()
@@ -171,7 +172,7 @@ namespace CadEye.Lib
                         });
                     }
 
-                    _db.Child_File_Table(source_node, null, DbAction.Upsert);
+                    _db.Child_File_Table(source_node, null, DbAction.Update);
                     vm.File_input_Event();
                     return;
                 }
@@ -190,7 +191,8 @@ namespace CadEye.Lib
 
                     if (target_node == null)
                     {
-                        var target_node_hash = child_node.FindOne(x => x.HashToken == has);
+                        var all_nodes = child_node.FindAll();
+                        var target_node_hash = all_nodes.FirstOrDefault(x => x.HashToken.SequenceEqual(has));
                         if (target_node_hash == null)
                         {
                             // Created
@@ -205,6 +207,7 @@ namespace CadEye.Lib
                             source_node.Feature = new List<string>();
                             source_node.Event = new List<EventEntry>();
                             source_node.Image = new List<ImageEntry>();
+                            source_node.Detele_Check = 0;
 
                             Event = "Created";
 
@@ -230,6 +233,7 @@ namespace CadEye.Lib
                                 source_node.Feature = target_node_hash.Feature;
                                 source_node.Event = target_node_hash.Event;
                                 source_node.Image = target_node_hash.Image;
+                                source_node.Detele_Check = 0;
                                 Event = "Moved";
 
                                 source_node.Event.Add(new EventEntry()
@@ -274,6 +278,7 @@ namespace CadEye.Lib
                                 source_node.Feature = target_node_hash.Feature;
                                 source_node.Event = target_node_hash.Event;
                                 source_node.Image = target_node_hash.Image;
+                                source_node.Detele_Check = 0;
                                 Event = "Copyed";
 
                                 source_node.Event.Add(new EventEntry()
@@ -303,18 +308,99 @@ namespace CadEye.Lib
                     }
                     else
                     {
-                        // Changed
-                        key = target_node.Key;
-                        source_node.Key = key;
-                        source_node.File_Path = e.FullPath;
-                        source_node.File_Name = fileName;
-                        source_node.HashToken = has;
-                        source_node.list = target_node.list;
-                        source_node.Feature = target_node.Feature;
-                        source_node.Event = target_node.Event;
-                        source_node.Image = target_node.Image;
-                        Event = "Changed";
+                        // Restore
+                        if (target_node.Detele_Check == 1)
+                        {
+                            key = target_node.Key;
+                            source_node.Key = key;
+                            source_node.File_Path = e.FullPath;
+                            source_node.File_Name = fileName;
+                            source_node.HashToken = has;
+                            source_node.list = target_node.list;
+                            source_node.Feature = target_node.Feature;
+                            source_node.Event = target_node.Event;
+                            source_node.Image = target_node.Image;
+                            source_node.Detele_Check = 0;
+                            Event = "Restore";
 
+                            source_node.Event.Add(new EventEntry()
+                            {
+                                Key = source_node.Key,
+                                Time = time,
+                                Type = Event,
+                                Description = "복원"
+                            });
+
+
+                            if (source_node.Image.Count() > 0)
+                            {
+                                source_node.Image.Add(new ImageEntry()
+                                {
+                                    Key = source_node.Key,
+                                    Time = time,
+                                    Data = target_node.Image[target_node.Image.Count() - 1].Data,
+                                });
+                            }
+
+                            _db.Child_File_Table(source_node, null, DbAction.Update);
+                            vm.File_input_Event();
+                            return;
+                        }
+                        else
+                        {
+                            if (target_node.HashToken.SequenceEqual(has))
+                            {
+                                key = target_node.Key;
+                                source_node.Key = key;
+                                source_node.File_Path = e.FullPath;
+                                source_node.File_Name = fileName;
+                                source_node.HashToken = has;
+                                source_node.list = target_node.list;
+                                source_node.Feature = target_node.Feature;
+                                source_node.Event = target_node.Event;
+                                source_node.Image = target_node.Image;
+                                source_node.Detele_Check = 0;
+                                Event = "No-Changed";
+
+                                source_node.Event.Add(new EventEntry()
+                                {
+                                    Key = source_node.Key,
+                                    Time = time,
+                                    Type = Event,
+                                    Description = "내용이 안변했습니다"
+                                });
+
+
+                                if (source_node.Image.Count() > 0)
+                                {
+                                    source_node.Image.Add(new ImageEntry()
+                                    {
+                                        Key = source_node.Key,
+                                        Time = time,
+                                        Data = target_node.Image[target_node.Image.Count() - 1].Data,
+                                    });
+                                }
+
+                                _db.Child_File_Table(source_node, null, DbAction.Update);
+                                vm.File_input_Event();
+                                return;
+                            }
+                            else
+                            {
+                                // Changed
+                                key = target_node.Key;
+                                source_node.Key = key;
+                                source_node.File_Path = e.FullPath;
+                                source_node.File_Name = fileName;
+                                source_node.HashToken = has;
+                                source_node.list = target_node.list;
+                                source_node.Feature = target_node.Feature;
+                                source_node.Event = target_node.Event;
+                                source_node.Image = target_node.Image;
+                                source_node.Detele_Check = 0;
+                                Event = "Changed";
+                            }
+                        }
                         _db.Child_File_Table(source_node, null, DbAction.Upsert);
                         File_Copy(e, time, key, Event);
                         vm.File_input_Event();
@@ -475,7 +561,6 @@ namespace CadEye.Lib
                 }
             }
         }
-
         private void Repository(FileSystemEventArgs e)
         {
             try
@@ -510,7 +595,6 @@ namespace CadEye.Lib
                         Key = source_node.Key,
                         Time = name_parts.Item1,
                         Type = name_parts.Item2,
-                        Description = $"{e.Name}"
                     });
 
                     int retry = 5;

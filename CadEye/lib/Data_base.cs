@@ -73,6 +73,7 @@ namespace CadEye.Lib
         public List<string> list { get; set; }
         public List<EventEntry> Event { get; set; }
         public List<ImageEntry> Image { get; set; }
+        public long Detele_Check { get; set; }
     }
     public enum DbAction
     {
