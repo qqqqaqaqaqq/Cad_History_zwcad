@@ -12,7 +12,6 @@ namespace CadEye.Lib
     {
         private static LiteDatabase _instance;
         public static bool IsManager { get; private set; }
-
         public static void Initialize(bool isManager, string dbFileName)
         {
             string exePath = AppDomain.CurrentDomain.BaseDirectory;
@@ -63,9 +62,11 @@ namespace CadEye.Lib
 
         [BsonId]
         public long Key { get; set; }
-        public string File_Path { get; set; } = "";
-        public byte[] HashToken { get; set; }
+        public string File_FullName { get; set; } = "";
         public string File_Name { get; set; } = "";
+        public string File_Directory { get; set; } = "";
+        public DateTime AccesTime { get; set; } = DateTime.MinValue;
+        public byte[] HashToken { get; set; }
         public List<string> Feature { get; set; }
         public List<string> list { get; set; }
         public List<EventEntry> Event { get; set; }
@@ -81,7 +82,6 @@ namespace CadEye.Lib
         Update,
         Insert,  
     }
-
     public class Data_base
     {
         public readonly object _lock = new object();

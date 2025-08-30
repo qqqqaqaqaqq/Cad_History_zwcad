@@ -33,7 +33,7 @@ namespace CadEye.Lib
                     .ToList();
                 var options = new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount };
                 var item_insert = new ConcurrentBag<Child_File>();
-                var existingFiles = childdb.FindAll().Select(x => new { x.File_Path, x.HashToken }).ToList();
+                var existingFiles = childdb.FindAll().Select(x => new { x.File_FullName, x.HashToken }).ToList();
 
                 Parallel.ForEach(fileSystemEntries, options, file =>
                 {
@@ -43,18 +43,20 @@ namespace CadEye.Lib
                         {
                             byte[] hash = Hash_Allocated_Unique(file.FullName);
 
-                            bool check = existingFiles.Any(x => x.File_Path == file.FullName && x.HashToken.SequenceEqual(hash));
+                            bool check = existingFiles.Any(x => x.File_FullName == file.FullName && x.HashToken.SequenceEqual(hash));
                             if (check) { return; }
 
-                            var node = new Child_File();
+                            var source_node = new Child_File();
 
-                            node.File_Path = file.FullName;
-                            node.File_Name = file.Name;
-                            node.HashToken = hash;
-                            node.Event = new List<EventEntry>();
-                            node.Image = new List<ImageEntry>();
+                            source_node.File_FullName = file.FullName;
+                            source_node.File_Name = file.Name;
+                            source_node.File_Directory = Path.GetDirectoryName(file.FullName);
+                            source_node.AccesTime = file.LastAccessTime;
+                            source_node.HashToken = hash;
+                            source_node.Event = new List<EventEntry>();
+                            source_node.Image = new List<ImageEntry>();
 
-                            item_insert.Add(node);
+                            item_insert.Add(source_node);
                         }
                     }
                 });
@@ -68,9 +70,10 @@ namespace CadEye.Lib
         }
         public byte[] Hash_Allocated_Unique(string fullName)
         {
-            bool check = vm.Read_Respone(fullName, "Hash_Allocated_Unique");
+            bool check = vm.Read_Respone(fullName, "Hash_Allocated_Unique_Filename");
             if (!check) { return null; }
             {
+                var foldername = vm.folderpath;
                 var fileName = Path.GetFileName(fullName);
 
                 if (fileName.StartsWith("~$"))

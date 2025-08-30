@@ -35,9 +35,6 @@ namespace CadEye.View
                     vm.File_Description();
                     await vm.Pdf_Load_btn();
                     vm.Data_View();
-
-                    string result = $"File_List_Selecetd Succed";
-                    vm.Event_History_Add(result);
                 }
             }
             catch
@@ -117,9 +114,6 @@ namespace CadEye.View
                     DateTime.Now.Second);
                 await vm.Extrude_btn(time);
                 Overlay.Visibility = Visibility.Hidden;
-
-                string result = $"DB_Update Succed";
-                vm.Event_History_Add(result);
             }
             catch
             {
@@ -127,7 +121,6 @@ namespace CadEye.View
                 vm.Event_History_Add(result);
             }
         }
-
         public int isinitial = 0;
         public async void Tree_Update(object sender, RoutedEventArgs e)
         {

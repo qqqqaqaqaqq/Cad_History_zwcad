@@ -10,6 +10,7 @@
     <Border BorderThickness="1" BorderBrush="#333333">
         <DataGrid x:Name="FildData_Grid" 
                   VerticalAlignment="Top"
+                  IsReadOnly="True"
                   Style="{StaticResource Data_Gaid_Background}"
                   ColumnHeaderStyle ="{StaticResource Data_Grid_ColumnHeader}"
                   CellStyle="{StaticResource Data_Grid_Cell}"

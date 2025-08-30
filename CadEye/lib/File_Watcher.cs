@@ -1,4 +1,5 @@
 ﻿using CadEye.ViewCS;
+using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -6,9 +7,12 @@ using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Security.Policy;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Windows.Documents;
 using System.Windows.Input;
+using static System.Windows.Forms.VisualStyles.VisualStyleElement.TaskbarClock;
 
 namespace CadEye.Lib
 {
@@ -37,42 +41,50 @@ namespace CadEye.Lib
             _watcher.EnableRaisingEvents = true;
         }
 
-        private List<(FileSystemEventArgs, string, DateTime)> source_list = new List<(FileSystemEventArgs, string, DateTime)>();
+        private List<(FileSystemEventArgs, string)> source_list = new List<(FileSystemEventArgs, string)>();
         private ConcurrentQueue<FileSystemEventArgs> eventQueue = new ConcurrentQueue<FileSystemEventArgs>();
         private bool isCollecting = false;
-
+        private readonly object _lock = new object();
         public async void Bridge_Event(object sender, FileSystemEventArgs e)
         {
-            bool check_ext = vm.FilterExt(e.FullPath);
-            if (!check_ext) return;
-            DateTime current_time = DateTime.Now;
-            source_list.Add((e, e.FullPath, current_time));
-
-            if (!isCollecting)
+            bool ext_chk = vm.FilterExt(e.FullPath);
+            if (!ext_chk) { return; }
+            bool read_chk = vm.Read_Respone(e.FullPath, "Bridge_Event", e.ChangeType.ToString());
+            if (!read_chk)
             {
-                if (source_list.Count() > 0)
+                Deleted_Exception(e);
+                return;
+            }
+            else
+            {
+                source_list.Add((e, e.FullPath));
+                if (!isCollecting)
                 {
-                    isCollecting = true;
-                    await Task.Delay(1000);
-
-                    List<(FileSystemEventArgs, string, DateTime)> target_list =
-                        new List<(FileSystemEventArgs, string, DateTime)>();
-                    List<FileSystemEventArgs> filter_list = new List<FileSystemEventArgs>();
-
-                    foreach (var list in source_list)
+                    if (source_list.Count() > 0)
                     {
-                        target_list.Add(list);
+                        isCollecting = true;
+                        await Task.Delay(300);
+                        List<(FileSystemEventArgs, string)> target_list =
+                            new List<(FileSystemEventArgs, string)>();
+                        List<FileSystemEventArgs> filter_list = new List<FileSystemEventArgs>();
+                        foreach (var list in source_list)
+                        {
+                            target_list.Add(list);
+                        }
+                        filter_list = Detected(target_list);
+                        foreach (var list in filter_list.ToList())
+                        {
+                            lock (_lock)
+                            {
+                                eventQueue.Enqueue(list);
+                            }
+                        }
+                        isCollecting = false;
                     }
-                    filter_list = Detected(target_list);
-                    foreach (var list in filter_list.ToList())
-                    {
-                        eventQueue.Enqueue(list);
-                    }
-                    isCollecting = false;
                 }
             }
         }
-        public List<FileSystemEventArgs> Detected(List<(FileSystemEventArgs, string, DateTime)> target_list)
+        public List<FileSystemEventArgs> Detected(List<(FileSystemEventArgs, string)> target_list)
         {
             Dictionary<string, FileSystemEventArgs> uniqueEvents = new Dictionary<string, FileSystemEventArgs>();
 
@@ -90,12 +102,60 @@ namespace CadEye.Lib
 
             return uniqueEvents.Values.ToList();
         }
+        public void Deleted_Exception(FileSystemEventArgs e)
+        {
+            // Deleted
+            DateTime time = new DateTime(
+                DateTime.Now.Year,
+                DateTime.Now.Month,
+                DateTime.Now.Day,
+                DateTime.Now.Hour,
+                DateTime.Now.Minute,
+                DateTime.Now.Second
+            );
+            var child_node = DatabaseProvider.Child_Node;
+            var target_node = child_node.FindOne(x => x.File_FullName == e.FullPath);
+
+            var foldername = Path.GetDirectoryName(target_node.File_FullName);
+            var relative = Path.GetFileName(foldername);
+            var relativefilename = Path.Combine(relative, Path.GetFileName(target_node.File_FullName));
+            var source_node = new Child_File();
+
+            source_node.Key = target_node.Key;
+            source_node.File_FullName = e.FullPath;
+            source_node.File_Name = target_node.File_Name;
+            source_node.File_Directory = target_node.File_Directory;
+            source_node.AccesTime = target_node.AccesTime;
+            source_node.HashToken = target_node.HashToken;
+            source_node.list = target_node.list;
+            source_node.Feature = target_node.Feature;
+            source_node.Event = target_node.Event;
+            source_node.Image = target_node.Image;
+            source_node.Detele_Check = 1;
+            string Event = "Deleted";
+
+            source_node.Event.Add(new EventEntry()
+            {
+                Key = source_node.Key,
+                Time = time,
+                Type = Event,
+                Description = $"Deleted : {relativefilename}"
+            });
+
+            _db.Child_File_Table(source_node, null, DbAction.Update);
+            string result = $"Deleted Succed, {e.FullPath}";
+            vm.Event_History_Add(result);
+        }
         public async Task Brdige_Queue()
         {
             while (true)
             {
                 if (eventQueue.TryDequeue(out var e))
                 {
+                    if (e.ChangeType == WatcherChangeTypes.Deleted) { }
+                    string result = $"WorkFlow Progressing., {e.FullPath}";
+                    vm.Event_History_Add(result);
+
                     DateTime time = new DateTime(
                         DateTime.Now.Year,
                         DateTime.Now.Month,
@@ -104,345 +164,296 @@ namespace CadEye.Lib
                         DateTime.Now.Minute,
                         DateTime.Now.Second
                     );
+
+                    bool complete_chk = false;
+
                     switch (e.ChangeType)
                     {
                         case WatcherChangeTypes.Created:
-                            File_A(e, time);
+                            complete_chk = File_A(e, time);
                             break;
                         case WatcherChangeTypes.Changed:
-                            File_A(e, time);
-                            break;
-                        case WatcherChangeTypes.Deleted:
-                            File_A(e, time);
+                            complete_chk = File_A(e, time);
                             break;
                         case WatcherChangeTypes.Renamed:
-                            File_B(e, time);
+                            complete_chk = File_B(e, time);
                             break;
                     }
-                    Debug.WriteLine($"{e.FullPath} Clear");
-                    Thread.Sleep(200);
+
+                    if (!complete_chk)
+                    {
+                        result = $"WorkFlow Failed. {e.FullPath}";
+                        vm.Event_History_Add(result);
+                    }
+
+                    await Task.Delay(100);
+                    // return; 리턴쓰면 오류걸림
                 }
                 else
                 {
-                    await Task.Delay(50);
+                    await Task.Delay(100);
                 }
             }
         }
-        private void File_A(FileSystemEventArgs e, DateTime time)
+        private bool File_A(FileSystemEventArgs e, DateTime time)
         {
             try
             {
                 bool read_chk = vm.Read_Respone(e.FullPath, "File_A", e.ChangeType.ToString());
                 if (!read_chk)
                 {
-                    // Deleted
-                    var child_node = DatabaseProvider.Child_Node;
-                    var target_node = child_node.FindOne(x => x.File_Path == e.FullPath);
-
-                    var foldername = Path.GetDirectoryName(target_node.File_Path);
-                    var relative = Path.GetFileName(foldername);
-                    var relativefilename = Path.Combine(relative, Path.GetFileName(target_node.File_Path));
-                    var source_node = new Child_File();
-
-                    source_node.Key = target_node.Key;
-                    source_node.File_Path = e.FullPath;
-                    source_node.HashToken = target_node.HashToken;
-                    source_node.File_Name = target_node.File_Name;
-                    source_node.list = target_node.list;
-                    source_node.Feature = target_node.Feature;
-                    source_node.Event = target_node.Event;
-                    source_node.Image = target_node.Image;
-                    source_node.Detele_Check = 1;
-                    string Event = "Deleted";
-
-                    source_node.Event.Add(new EventEntry()
-                    {
-                        Key = source_node.Key,
-                        Time = time,
-                        Type = Event,
-                        Description = $"Deleted : {relativefilename}"
-                    });
-
-
-                    if (source_node.Image.Count() > 0)
-                    {
-                        source_node.Image.Add(new ImageEntry()
-                        {
-                            Key = source_node.Key,
-                            Time = time,
-                            Data = target_node.Image[target_node.Image.Count() - 1].Data,
-                        });
-                    }
-
-                    _db.Child_File_Table(source_node, null, DbAction.Update);
-                    vm.File_input_Event();
-                    Thread.Sleep(200);
-
-                    string result = $"File_A Deleted Succed, {e.FullPath}";
-                    vm.Event_History_Add(result);
-
-                    return;
+                    return false;
                 }
                 else
                 {
-                    var child_node = DatabaseProvider.Child_Node;
-                    var target_node = child_node.FindOne(x => x.File_Path == e.FullPath);
 
+                    var child_node = DatabaseProvider.Child_Node;
                     var source_node = new Child_File();
                     long key = 0;
+
+                    string fileName = Path.GetFileName(e.FullPath);
+                    string Event = "";
+                    string result = "";
+                    string relative = "";
+                    string relativefilename = "";
                     byte[] has;
 
                     has = file_check.Hash_Allocated_Unique(e.FullPath);
-                    string fileName = Path.GetFileName(e.FullPath);
-                    string Event = "";
 
-                    if (target_node == null)
+                    var file = new FileInfo(e.FullPath);
+                    DateTime access_time = new DateTime(
+                       file.LastAccessTime.Year,
+                       file.LastAccessTime.Month,
+                       file.LastAccessTime.Day,
+                       file.LastAccessTime.Hour,
+                       file.LastAccessTime.Minute,
+                       file.LastAccessTime.Second
+                    );
+
+                    var target_node = child_node.FindOne(x => x.File_FullName == e.FullPath);
+                    var target_node_hash = child_node.FindAll().FirstOrDefault(x => x.HashToken.SequenceEqual(has));
+                    var target_node_access = child_node.FindAll().Where(x => x.HashToken.SequenceEqual(has)).FirstOrDefault(x => x.AccesTime == access_time);
+                    var allkeys = child_node.FindAll().Select(x => x.Key);
+                    string fullName = e.FullPath;
+                    // Created
+                    if (target_node == null && target_node_hash == null)
                     {
-                        var all_nodes = child_node.FindAll();
-                        var target_node_hash = all_nodes.FirstOrDefault(x => x.HashToken.SequenceEqual(has));
-                        if (target_node_hash == null)
-                        {
-                            // Created
-                            var allkeys = child_node.FindAll().Select(x => x.Key);
-                            key = allkeys.Any() ? allkeys.Max() + 1 : 1;
 
-                            source_node.Key = key;
-                            source_node.File_Path = e.FullPath;
-                            source_node.File_Name = fileName;
-                            source_node.HashToken = has;
+                        key = allkeys.Any() ? allkeys.Max() + 1 : 1;
+
+                        source_node = SettingSourceNode(fullName, key, has);
+
+                        source_node.Event = new List<EventEntry>();
+                        source_node.Image = new List<ImageEntry>();
+
+                        Event = "Created";
+
+                        source_node.Event.Add(new EventEntry()
+                        {
+                            Key = source_node.Key,
+                            Time = time,
+                            Type = Event,
+                        });
+
+                        result = $"File_A Created Succed, {e.FullPath}";
+                        vm.Event_History_Add(result);
+
+                        _db.Child_File_Table(source_node, null, DbAction.Insert);
+                        File_Copy(source_node.File_FullName, time, source_node.Key, Event);
+                        vm.File_input_Event();
+                        return true;
+                    }
+                    // Moved
+                    else if ((target_node == null && target_node_hash != null) && target_node_access != null)
+                    {
+                        key = target_node_access.Key;
+                        var foldername = Path.GetDirectoryName(e.FullPath);
+                        relative = Path.GetFileName(foldername);
+                        relativefilename = Path.Combine(relative, Path.GetFileName(e.FullPath));
+
+                        source_node = SettingSourceNode(fullName, key, has, target_node_access);
+
+                        Event = "Moved";
+
+                        source_node.Event.Add(new EventEntry()
+                        {
+                            Key = source_node.Key,
+                            Time = time,
+                            Type = Event,
+                            Description = $"Origin Address : {relativefilename}",
+                        });
+
+                        result = $"File_A Moved Succed, {e.FullPath}";
+                        vm.Event_History_Add(result);
+
+                        _db.Child_File_Table(source_node, null, DbAction.Update);
+                        File_Copy(source_node.File_FullName, time, source_node.Key, Event);
+                        vm.File_input_Event();
+                        return true;
+                    }
+                    // Copyed
+                    else if ((target_node == null && target_node_hash != null) && target_node_access == null)
+                    {
+                        var foldername = Path.GetDirectoryName(target_node_hash.File_FullName);
+                        relative = Path.GetFileName(foldername);
+                        relativefilename = Path.Combine(relative, Path.GetFileName(target_node_hash.File_FullName));
+
+                        key = allkeys.Any() ? allkeys.Max() + 1 : 1;
+
+                        source_node = SettingSourceNode(fullName, key, has, target_node_hash);
+
+                        {
                             source_node.list = new List<string>();
                             source_node.Feature = new List<string>();
                             source_node.Event = new List<EventEntry>();
                             source_node.Image = new List<ImageEntry>();
-                            source_node.Detele_Check = 0;
+                        }
 
-                            Event = "Created";
+                        Event = "Copyed";
+
+                        source_node.Event.Add(new EventEntry()
+                        {
+                            Key = source_node.Key,
+                            Time = time,
+                            Type = Event,
+                            Description = $"Origin File : {relativefilename}"
+                        });
+
+                        {
+                            result = $"File_A Copyed Succed, {e.FullPath}";
+                            vm.Event_History_Add(result);
 
                             _db.Child_File_Table(source_node, null, DbAction.Insert);
-                            File_Copy(e.FullPath, time, key, Event);
+                            File_Copy(source_node.File_FullName, time, source_node.Key, Event);
                             vm.File_input_Event();
-
-                            string result = $"File_A Created Succed, {e.FullPath}";
-                            vm.Event_History_Add(result);
-
-                            return;
-                        }
-                        else
-                        {
-                            if (!File.Exists(target_node_hash.File_Path))
-                            {
-                                // Moved
-                                key = target_node_hash.Key;
-                                var foldername = Path.GetDirectoryName(e.FullPath);
-                                var relative = Path.GetFileName(foldername);
-                                var relativefilename = Path.Combine(relative, Path.GetFileName(e.FullPath));
-
-                                source_node.Key = key;
-                                source_node.File_Path = e.FullPath;
-                                source_node.File_Name = fileName;
-                                source_node.HashToken = has;
-                                source_node.list = target_node_hash.list;
-                                source_node.Feature = target_node_hash.Feature;
-                                source_node.Event = target_node_hash.Event;
-                                source_node.Image = target_node_hash.Image;
-                                source_node.Detele_Check = 0;
-                                Event = "Moved";
-
-                                source_node.Event.Add(new EventEntry()
-                                {
-                                    Key = source_node.Key,
-                                    Time = time,
-                                    Type = Event,
-                                    Description = $"Origin Address : {relativefilename}",
-                                });
-
-
-                                if (source_node.Image.Count() > 0)
-                                {
-                                    source_node.Image.Add(new ImageEntry()
-                                    {
-                                        Key = source_node.Key,
-                                        Time = time,
-                                        Data = target_node_hash.Image[target_node_hash.Image.Count() - 1].Data,
-                                    });
-                                }
-
-                                _db.Child_File_Table(source_node, null, DbAction.Upsert);
-                                vm.File_input_Event();
-
-                                string result = $"File_A Moved Succed, {e.FullPath}";
-                                vm.Event_History_Add(result);
-
-                                return;
-                            }
-                            else
-                            {
-                                // Copyed
-                                var foldername = Path.GetDirectoryName(target_node_hash.File_Path);
-                                var relative = Path.GetFileName(foldername);
-                                var relativefilename = Path.Combine(relative, Path.GetFileName(target_node_hash.File_Path));
-
-                                var allkeys = child_node.FindAll().Select(x => x.Key);
-                                key = allkeys.Any() ? allkeys.Max() + 1 : 1;
-
-                                source_node.Key = key;
-                                source_node.File_Path = e.FullPath;
-                                source_node.File_Name = fileName;
-                                source_node.HashToken = has;
-                                source_node.list = target_node_hash.list;
-                                source_node.Feature = target_node_hash.Feature;
-                                source_node.Event = new List<EventEntry>();
-                                source_node.Image = new List<ImageEntry>();
-                                source_node.Detele_Check = 0;
-                                Event = "Copyed";
-
-                                source_node.Event.Add(new EventEntry()
-                                {
-                                    Key = source_node.Key,
-                                    Time = time,
-                                    Type = Event,
-                                    Description = $"Origin File : {relativefilename}"
-                                });
-
-                                _db.Child_File_Table(source_node, null, DbAction.Upsert);
-                                File_Copy(e.FullPath, time, key, Event);
-                                vm.File_input_Event();
-
-                                string result = $"File_A Copyed Succed, {e.FullPath}";
-                                vm.Event_History_Add(result);
-
-                                return;
-                            }
+                            return true;
                         }
                     }
-                    else
+                    // Restore
+                    else if (target_node != null && target_node.Detele_Check == 1)
                     {
-                        // Restore
-                        if (target_node.Detele_Check == 1)
+                        key = target_node.Key;
+
+                        source_node = SettingSourceNode(fullName, key, has, target_node);
+
+                        Event = "Restore";
+
+                        source_node.Event.Add(new EventEntry()
                         {
-                            key = target_node.Key;
-                            source_node.Key = key;
-                            source_node.File_Path = e.FullPath;
-                            source_node.File_Name = fileName;
-                            source_node.HashToken = has;
-                            source_node.list = target_node.list;
-                            source_node.Feature = target_node.Feature;
-                            source_node.Event = target_node.Event;
-                            source_node.Image = target_node.Image;
-                            source_node.Detele_Check = 0;
-                            Event = "Restore";
+                            Key = source_node.Key,
+                            Time = time,
+                            Type = Event,
+                            Description = "Restore Completed"
+                        });
 
-                            source_node.Event.Add(new EventEntry()
-                            {
-                                Key = source_node.Key,
-                                Time = time,
-                                Type = Event,
-                                Description = "Restore Completed"
-                            });
-
-
-                            if (source_node.Image.Count() > 0)
-                            {
-                                source_node.Image.Add(new ImageEntry()
-                                {
-                                    Key = source_node.Key,
-                                    Time = time,
-                                    Data = target_node.Image[target_node.Image.Count() - 1].Data,
-                                });
-                            }
+                        {
+                            result = $"File_A Restore Succed, {e.FullPath}";
+                            vm.Event_History_Add(result);
 
                             _db.Child_File_Table(source_node, null, DbAction.Update);
+                            File_Copy(source_node.File_FullName, time, source_node.Key, Event);
                             vm.File_input_Event();
-
-                            string result = $"File_A Restore Succed, {e.FullPath}";
-                            vm.Event_History_Add(result);
-
-                            return;
-                        }
-                        else
-                        {
-                            // No Changed
-                            var all_nodes = child_node.FindAll();
-                            var target_node_hash = all_nodes.FirstOrDefault(x => x.HashToken.SequenceEqual(has));
-                            if (target_node_hash != null)
-                            {
-                                key = target_node.Key;
-                                source_node.Key = key;
-                                source_node.File_Path = e.FullPath;
-                                source_node.File_Name = fileName;
-                                source_node.HashToken = has;
-                                source_node.list = target_node.list;
-                                source_node.Feature = target_node.Feature;
-                                source_node.Event = target_node.Event;
-                                source_node.Image = target_node.Image;
-                                source_node.Detele_Check = 0;
-                                Event = "No-Changed";
-
-                                source_node.Event.Add(new EventEntry()
-                                {
-                                    Key = source_node.Key,
-                                    Time = time,
-                                    Type = Event,
-                                    Description = "HashToken matches"
-                                });
-
-
-                                if (source_node.Image.Count() > 0)
-                                {
-                                    source_node.Image.Add(new ImageEntry()
-                                    {
-                                        Key = source_node.Key,
-                                        Time = time,
-                                        Data = target_node.Image[target_node.Image.Count() - 1].Data,
-                                    });
-                                }
-
-                                _db.Child_File_Table(source_node, null, DbAction.Update);
-                                vm.File_input_Event();
-
-
-                                string result = $"File_A No-Changed Succed, {e.FullPath}";
-                                vm.Event_History_Add(result);
-
-                                return;
-                            }
-                            else
-                            {
-                                // Changed
-                                key = target_node.Key;
-                                source_node.Key = key;
-                                source_node.File_Path = e.FullPath;
-                                source_node.File_Name = fileName;
-                                source_node.HashToken = has;
-                                source_node.list = target_node.list;
-                                source_node.Feature = target_node.Feature;
-                                source_node.Event = target_node.Event;
-                                source_node.Image = target_node.Image;
-                                source_node.Detele_Check = 0;
-                                Event = "Changed";
-
-                                _db.Child_File_Table(source_node, null, DbAction.Update);
-                                File_Copy(e.FullPath, time, key, Event);
-                                vm.File_input_Event();
-
-                                string result = $"File_A Changed Succed, {e.FullPath}";
-                                vm.Event_History_Add(result);
-
-                                return;
-                            }
+                            return true;
                         }
                     }
+                    // No-Changed
+                    else if ((target_node != null && target_node.Detele_Check != 1) && target_node_hash != null)
+                    {
+                        key = target_node.Key;
+
+                        source_node = SettingSourceNode(fullName, key, has, target_node);
+
+                        Event = "No-Changed";
+
+                        source_node.Event.Add(new EventEntry()
+                        {
+                            Key = source_node.Key,
+                            Time = time,
+                            Type = Event,
+                            Description = "HashToken matches"
+                        });
+
+                        result = $"File_A No-Changed Succed, {e.FullPath}";
+                        vm.Event_History_Add(result);
+
+                        {
+                            _db.Child_File_Table(source_node, null, DbAction.Update);
+                            File_Copy(source_node.File_FullName, time, source_node.Key, Event);
+                            vm.File_input_Event();
+                            return true;
+                        }
+                    }
+                    // Changed
+                    else if ((target_node != null && target_node.Detele_Check != 1) && target_node_hash == null)
+                    {
+                        key = target_node.Key;
+
+                        source_node = SettingSourceNode(fullName, key, has, target_node);
+                        Event = "Changed";
+
+                        source_node.Event.Add(new EventEntry()
+                        {
+                            Key = source_node.Key,
+                            Time = time,
+                            Type = Event,
+                        });
+
+                        result = $"File_A Changed Succed, {e.FullPath}";
+                        vm.Event_History_Add(result);
+
+                        {
+                            _db.Child_File_Table(source_node, null, DbAction.Update);
+                            File_Copy(source_node.File_FullName, time, source_node.Key, Event);
+                            vm.File_input_Event();
+                            return true;
+                        }
+                    }
+
+                    return false;
                 }
             }
             catch (Exception)
             {
-                string result = $"File_A Failed, {e.FullPath}";
-                vm.Event_History_Add(result);
-
-                return;
+                return false;
             }
         }
-        private void File_B(FileSystemEventArgs e, DateTime time)
+        public Child_File SettingSourceNode(string fullName, long key, byte[] has, Child_File target_node = null)
+        {
+            var file = new FileInfo(fullName);
+            DateTime access_time = new DateTime(
+               file.LastAccessTime.Year,
+               file.LastAccessTime.Month,
+               file.LastAccessTime.Day,
+               file.LastAccessTime.Hour,
+               file.LastAccessTime.Minute,
+               file.LastAccessTime.Second
+            );
+
+            var source_node = new Child_File();
+            source_node.Key = key;
+            source_node.File_FullName = fullName;
+            source_node.File_Name = Path.GetFileName(fullName);
+            source_node.File_Directory = Path.GetDirectoryName(fullName);
+            source_node.AccesTime = access_time;
+            source_node.HashToken = has;
+            if (target_node != null)
+            {
+                source_node.list = target_node.list;
+                source_node.Feature = target_node.Feature;
+                source_node.Event = target_node.Event;
+                source_node.Image = target_node.Image;
+            }
+            else
+            {
+                source_node.list = new List<string>();
+                source_node.Feature = new List<string>();
+                source_node.Event = new List<EventEntry>();
+                source_node.Image = new List<ImageEntry>();
+            }
+            source_node.Detele_Check = 0;
+            return source_node;
+        }
+        private bool File_B(FileSystemEventArgs e, DateTime time)
         {
             try
             {
@@ -452,26 +463,30 @@ namespace CadEye.Lib
                     string result = $"Renamed Result Filed : {e.FullPath}";
                     vm.Event_History_Add(result);
 
-                    return;
+                    return false;
                 }
                 else
                 {
                     var re = e as RenamedEventArgs;
                     var file = new FileInfo(e.FullPath);
-                    var target_node = DatabaseProvider.Child_Node.FindOne(x => x.File_Path == re.OldFullPath);
-                    if (target_node == null) return;
+                    var target_node = DatabaseProvider.Child_Node.FindOne(x => x.File_FullName == re.OldFullPath);
+                    if (target_node == null) return false;
 
                     var source_node = new Child_File();
                     var filename = Path.GetFileName(e.FullPath);
+                    byte[] has = file_check.Hash_Allocated_Unique(e.FullPath);
+
                     source_node.Key = target_node.Key;
-                    source_node.File_Path = e.FullPath;
+                    source_node.File_FullName = e.FullPath;
                     source_node.File_Name = filename;
-                    source_node.HashToken = file_check.Hash_Allocated_Unique(e.FullPath);
+                    source_node.File_Directory = Path.GetDirectoryName(e.FullPath);
+                    source_node.HashToken = has;
                     source_node.list = target_node.list;
                     source_node.Feature = target_node.Feature;
                     source_node.Event = target_node.Event;
                     source_node.Image = target_node.Image;
 
+                    string Event = "Renamed";
                     source_node.Event.Add(new EventEntry
                     {
                         Key = source_node.Key,
@@ -480,31 +495,18 @@ namespace CadEye.Lib
                         Description = $"Pre Name : {re.OldFullPath}"
                     });
 
-                    if (source_node.Image.Count > 0)
-                    {
-                        byte[] lastData = source_node.Image[source_node.Image.Count - 1].Data;
-
-                        source_node.Image.Add(new ImageEntry
-                        {
-                            Key = source_node.Key,
-                            Time = time,
-                            Data = (byte[])lastData.Clone()
-                        });
-                    }
-
-                    bool check = _db.Child_File_Table(source_node, null, DbAction.Upsert);
-
                     string result = $"Renamed Result Succed : {e.FullPath}";
                     vm.Event_History_Add(result);
 
+                    _db.Child_File_Table(source_node, null, DbAction.Update);
+                    File_Copy(source_node.File_FullName, time, source_node.Key, Event);
                     vm.File_input_Event();
+                    return true;
                 }
             }
             catch (Exception)
             {
-                string result = $"Renamed Result Failed, {e.FullPath}";
-                vm.Event_History_Add(result);
-
+                return false;
             }
         }
         private void SafeFileCopy(string sourcePath, string destPath, int retries = 5, int delayMs = 500)
@@ -580,10 +582,7 @@ namespace CadEye.Lib
             }
         }
         // --------------------------------------------------------------------------------- 저장소에 대한 감시
-
-
         private ConcurrentQueue<FileSystemEventArgs> eventQueue_repository = new ConcurrentQueue<FileSystemEventArgs>();
-
         public void SetupWatcher_repository(FileSystemWatcher _watcher)
         {
             Task.Run(Brdige_Queue_repository);
@@ -606,75 +605,74 @@ namespace CadEye.Lib
                             Repository(e);
                             break;
                     }
+                    await Task.Delay(100);
                 }
                 else
                 {
-                    await Task.Delay(50);
+                    await Task.Delay(100);
                 }
             }
         }
-        private void Repository(FileSystemEventArgs e)
+        private async void Repository(FileSystemEventArgs e)
         {
             try
             {
                 string result = "";
                 bool read_chk = vm.Read_Respone(e.FullPath, "Repository");
-                if (!read_chk) {
-                    return; }
+                if (!read_chk)
+                {
+                    return;
+                }
+                else
                 {
                     (DateTime, string, long) name_parts = file_name_parsing(e);
+                    var source_node = new Child_File();
+
+
+                    source_node.list = new List<string>();
+                    source_node.Feature = new List<string>();
+                    source_node.Event = new List<EventEntry>();
+                    source_node.Image = new List<ImageEntry>();
+
+                    int retry = 5;
+                    while (retry > 0)
+                    {
+                        source_node = Extrude_PDF(e, source_node, name_parts.Item1);
+
+                        if (source_node != null)
+                            break;
+
+                        await Task.Delay(200);
+                        retry--;
+                    }
 
                     var child_node = DatabaseProvider.Child_Node;
                     var target_node = child_node.FindOne(x => x.Key == name_parts.Item3);
 
-                    if (target_node == null)
+                    if (File.Exists(target_node.File_FullName))
                     {
-                        result = $"Repository Failed  : {e.FullPath}";
-                        vm.Event_History_Add(result);
-
-                        return;
+                        var temp_source_node = new ImageEntry();
+                        temp_source_node = source_node.Image[0];
+                        source_node.Key = target_node.Key;
+                        source_node.File_FullName = target_node.File_FullName;
+                        source_node.File_Name = target_node.File_Name;
+                        source_node.AccesTime = target_node.AccesTime;
+                        source_node.File_Directory = target_node.File_Directory;
+                        source_node.HashToken = target_node.HashToken;
+                        source_node.Event = target_node.Event;
+                        source_node.Image = target_node.Image;
+                        //===========================================
+                        source_node.Feature = source_node.Feature;
+                        source_node.list = source_node.list;
+                        source_node.Image.Add(temp_source_node);
                     }
 
-
-                    var source_node = new Child_File();
-
-                    source_node.Key = target_node.Key;
-                    source_node.File_Path = target_node.File_Path;
-                    source_node.File_Name = target_node.File_Name;
-                    source_node.HashToken = target_node.HashToken;
-                    source_node.Event = target_node.Event;
-                    source_node.Image = target_node.Image;
-                    source_node.Feature = target_node.Feature;
-                    source_node.list = target_node.list;
-
-                    source_node.Event.Add(new EventEntry()
-                    {
-                        Key = source_node.Key,
-                        Time = name_parts.Item1,
-                        Type = name_parts.Item2,
-                    });
-
-                    int retry = 5;
-                    while (retry-- > 0)
-                    {
-                        source_node = Extrude_PDF(e, source_node, name_parts.Item1);
-                        if (source_node == null)
-                        {
-                            Thread.Sleep(1000);
-                        }
-                        else
-                        { break; }
-                    }
-
-                    if (source_node != null)
-                    {
-                        bool check = _db.Child_File_Table(source_node, null, DbAction.Update);
-                    }
+                    _db.Child_File_Table(source_node, null, DbAction.Update);
                 }
                 result = $"Repository Succed : {e.FullPath}";
                 vm.Event_History_Add(result);
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 string result = $"Repository Failed : {e.FullPath}";
                 vm.Event_History_Add(result);
