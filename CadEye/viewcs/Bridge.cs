@@ -7,15 +7,12 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
-using System.IO.Packaging;
 using System.Linq;
-using System.Security.Policy;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Forms.Integration;
-using System.Windows.Input;
 
 namespace CadEye.ViewCS
 {
@@ -65,13 +62,14 @@ namespace CadEye.ViewCS
             }
         }
         public File_Check file_check = new File_Check();
-
-        // ========================================= //
         public string selectedItem { get; set; }
         public string folderpath { get; set; }
         private string repository_path { get; set; }
         public static string projectname { get; set; }
         public readonly object _Lock = new object();
+        public bool BackupbtnToggle = false;
+
+        // ========================================= //
         public void MainView_Start_Load()
         {
             Lib.File_Check filecheck = new Lib.File_Check();
@@ -421,12 +419,17 @@ namespace CadEye.ViewCS
             {
                 var child_db = DatabaseProvider.Child_Node;
                 var child_node = child_db.FindOne(x => x.File_FullName == selectedItem);
-                if (child_node == null) { return; }
+                if (child_node == null)
+                {
+                    return;
+                }
                 Application.Current.Dispatcher.Invoke(() =>
                 {
                     if (child_node.Image.Count == 0)
                     {
                         pdfpage.ResetHost();
+                        pdfpage2.ResetHost();
+                        return;
                     }
                     else
                     {
@@ -799,10 +802,12 @@ namespace CadEye.ViewCS
                     return false;
                 }
 
-                bool check_ext = FilterExt(path);
-                if (!check_ext) return false;
-
-                if (File.Exists(path))
+                (bool, bool) check_ext = FilterExt(path);
+                if (!check_ext.Item1)
+                    return false;
+                if (check_ext.Item2)
+                    return true;
+                else if (File.Exists(path))
                 {
                     try
                     {
@@ -821,21 +826,25 @@ namespace CadEye.ViewCS
             Debug.WriteLine($"[{point}] 최종 실패: 파일 접근 불가");
             return false;
         }
-        public bool FilterExt(string path)
+        public (bool, bool) FilterExt(string path)
         {
-            if (path.Contains(".log"))
-                return false;
-
-            if (path.Contains(".pdf"))
-                return false;
-
-            if (System.IO.Path.GetExtension(path) == "")
-                return false;
-
-            if (System.IO.Path.GetExtension(path).ToUpper() != ".DWG" && System.IO.Path.GetExtension(path).ToUpper() != ".DWF")
-                return false;
-
-            return true;
+            try
+            {
+                var attr = File.GetAttributes(path);
+                if (attr.HasFlag(FileAttributes.Directory))
+                    return (true, true);
+                else if (System.IO.Path.GetExtension(path).ToUpper() == ".DWG" || System.IO.Path.GetExtension(path).ToUpper() == ".DWF")
+                    return (true, false);
+                else
+                    return (false, false);
+            }
+            catch
+            {
+                if (System.IO.Path.GetExtension(path).ToUpper() == ".DWG" || System.IO.Path.GetExtension(path).ToUpper() == ".DWF")
+                    return (true, false);
+                else
+                    return (false, true);
+            }
         }
         public void FolderWatcher()
         {
@@ -849,8 +858,10 @@ namespace CadEye.ViewCS
             {
                 IncludeSubdirectories = true,
                 NotifyFilter = NotifyFilters.CreationTime
+                             | NotifyFilters.DirectoryName
                              | NotifyFilters.FileName
                              | NotifyFilters.LastWrite
+                             | NotifyFilters.LastAccess
             };
             _watcher.InternalBufferSize = 64 * 1024;
             watcher.SetupWatcher(_watcher);
@@ -875,10 +886,101 @@ namespace CadEye.ViewCS
         }
         public void Event_History_Add(string evt)
         {
-            Application.Current.Dispatcher.Invoke(() =>
+            try
             {
-                Event_History.Add(evt);
-            });
+                Application.Current.Dispatcher.Invoke(() =>
+                {
+                    Event_History.Add(evt);
+                });
+            }
+            catch (Exception)
+            {
+                Debug.WriteLine("Event_History_Add Error");
+            }
+        }
+        public async Task WorkFlow_DB_Backup()
+        {
+            BackupbtnToggle = !BackupbtnToggle;
+            if (BackupbtnToggle == true)
+            {
+                string backup_folder = "";
+                Application.Current.Dispatcher.Invoke(() =>
+                {
+                    Open_folderdialog open_folder = new Open_folderdialog();
+                    backup_folder = open_folder.PathSetting().Item1;
+                    backup_folder = Path.Combine(backup_folder, projectname);
+
+                    if (!Directory.Exists(backup_folder))
+                    {
+                        Directory.CreateDirectory(backup_folder);
+                    }
+                });
+                string exePath = AppDomain.CurrentDomain.BaseDirectory;
+
+                if (backup_folder == "")
+                {
+                    Debug.WriteLine("WorkFlow_DB_Backup Null");
+                    return;
+                }
+                while (BackupbtnToggle)
+                {
+
+                    DateTime time = new DateTime(
+                        DateTime.Now.Year,
+                        DateTime.Now.Month,
+                        DateTime.Now.Day,
+                        DateTime.Now.Hour,
+                        DateTime.Now.Minute,
+                        DateTime.Now.Second
+                    );
+
+                    string sourceDbFile = Path.Combine(exePath, $"{projectname}.db");
+                    string sourceLogFile = Path.Combine(exePath, $"{projectname}-log.db");
+                    string targetFileName = $"{projectname}";
+                    string targetDbFile = Path.Combine(backup_folder, $"{time.ToString("yyyy.MM.dd,HH.mm.ss")}_{targetFileName}.db");
+                    string targetLogFile = Path.Combine(backup_folder, $"{time.ToString("yyyy.MM.dd,HH.mm.ss")}_{targetFileName}-log.db");
+
+                    const int retries = 5;
+                    bool copySuccess = false;
+                    for (int i = 0; i < retries; i++)
+                    {
+                        try
+                        {
+
+                            using (var src = new FileStream(sourceDbFile, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                            using (var dest = new FileStream(targetDbFile, FileMode.Create, FileAccess.Write, FileShare.None))
+                            {
+                                src.CopyTo(dest);
+                            }
+
+                            using (var srcLog = new FileStream(sourceLogFile, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                            using (var destLog = new FileStream(targetLogFile, FileMode.Create, FileAccess.Write, FileShare.None))
+                            {
+                                srcLog.CopyTo(destLog);
+                            }
+
+                            copySuccess = true;
+                            break;
+                        }
+                        catch (IOException)
+                        {
+                            Thread.Sleep(50);
+                        }
+                    }
+
+                    if (!copySuccess)
+                    {
+                        Debug.WriteLine("[BackUp MODE COPY ERROR] Failed after retries.");
+                        continue;
+                    }
+
+                    await Task.Delay(600000);
+                }
+            }
+        }
+        public async void DB_Backup()
+        {
+            await Task.Run(() => WorkFlow_DB_Backup());
         }
     }
 }

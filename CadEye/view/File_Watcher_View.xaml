@@ -26,7 +26,7 @@
                     Header="Event" 
                     Binding="{Binding Type}" 
                     ElementStyle ="{StaticResource Data_ElementStyle}"
-                    Width="100"/>
+                    Width="120"/>
                 <DataGridTextColumn 
                     Header="Reason" 
                     Binding="{Binding Description}" 

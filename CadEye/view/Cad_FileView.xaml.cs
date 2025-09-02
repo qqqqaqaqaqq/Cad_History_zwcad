@@ -20,9 +20,10 @@ namespace CadEye.View
         public void Unvisible_btn()
         {
             DB_Update_btn.Visibility = Visibility.Hidden;
-            DB_Reset_btm.Visibility = Visibility.Hidden;
+            DB_Reset_btn.Visibility = Visibility.Hidden;
             DB_Write_btn.Visibility = Visibility.Hidden;
             DB_Read_btn.Visibility = Visibility.Visible;
+            DB_Backup_btn.Visibility = Visibility.Hidden;
         }
         public async void File_List_Selecetd(object sender, SelectedCellsChangedEventArgs e)
         {
@@ -152,6 +153,14 @@ namespace CadEye.View
                 vm.File_input_Event();
                 Overlay.Visibility = Visibility.Hidden;
             }
+        }
+        private void DB_Backup(object sender, RoutedEventArgs e)
+        {
+            if (!vm.BackupbtnToggle)
+                DB_Backup_btn.Content = "Progress..";
+            if (vm.BackupbtnToggle)
+                DB_Backup_btn.Content = "Stop";
+            vm.DB_Backup();
         }
     }
 }

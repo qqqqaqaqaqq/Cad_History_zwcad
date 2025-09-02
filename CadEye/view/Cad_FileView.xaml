@@ -16,6 +16,8 @@
             <RowDefinition Height="30"/>
             <RowDefinition Height="5"/>
             <RowDefinition Height="30"/>
+            <RowDefinition Height="5"/>
+            <RowDefinition Height="30"/>
         </Grid.RowDefinitions>
         <!-- <Button Grid.Row="0" Content="Search" Click="FolderSearch_btn" Style="{StaticResource Button_Glass}" ></Button> -->
 
@@ -103,6 +105,7 @@
         <Button Grid.Row="3" x:Name="DB_Write_btn" Visibility="Visible" Content="Tree Update" Click="Tree_Update" Style="{StaticResource Button_Glass}"></Button>
         <Button Grid.Row="3" x:Name="DB_Read_btn" Visibility="Hidden" Content="Tree Update" Click="DB_Read" Style="{StaticResource Button_Glass}"></Button>
         <Button Grid.Row="5" x:Name="DB_Update_btn" Content="DataBase Update" Click="DB_Update" Style="{StaticResource Button_Glass}"></Button>
-        <Button Grid.Row="7"  x:Name="DB_Reset_btm" Content="Data Reset" Click="Reset" Style="{StaticResource Button_Glass}"></Button>
+        <Button Grid.Row="7"  x:Name="DB_Backup_btn" Content="Data Back UP" Click="DB_Backup" Style="{StaticResource Button_Glass}"></Button>
+        <Button Grid.Row="9"  x:Name="DB_Reset_btn" Content="Data Reset" Click="Reset" Style="{StaticResource Button_Glass}"></Button>
     </Grid>
 </UserControl>

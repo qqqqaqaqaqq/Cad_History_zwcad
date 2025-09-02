@@ -1,5 +1,4 @@
 ﻿using CadEye.ViewCS;
-using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -7,12 +6,9 @@ using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
-using System.Security.Policy;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Windows.Documents;
-using System.Windows.Input;
-using static System.Windows.Forms.VisualStyles.VisualStyleElement.TaskbarClock;
+using System.Windows.Shapes;
 
 namespace CadEye.Lib
 {
@@ -23,14 +19,16 @@ namespace CadEye.Lib
         public ZwCad_Lib cad = new ZwCad_Lib();
         private ConcurrentQueue<string> _queue = new ConcurrentQueue<string>();
         private System.Timers.Timer _timer;
-
+        private List<(FileSystemEventArgs, string)> source_list = new List<(FileSystemEventArgs, string)>();
+        private ConcurrentQueue<FileSystemEventArgs> eventQueue = new ConcurrentQueue<FileSystemEventArgs>();
+        private ConcurrentQueue<FileSystemEventArgs> eventQueue_repository = new ConcurrentQueue<FileSystemEventArgs>();
+        private bool isCollecting = false;
+        private readonly object _lock = new object();
         public Bridge vm
         {
             get { return Bridge.Instance; }
         }
-
-
-        // --------------------------------------------------------------------------------- 폴더에 대한 감시
+        // --------------------------------------------------------------------------------- 파일 감시
         public void SetupWatcher(FileSystemWatcher _watcher)
         {
             Task.Run(Brdige_Queue);
@@ -40,19 +38,16 @@ namespace CadEye.Lib
             _watcher.Renamed += (s, e) => Bridge_Event(s, e);
             _watcher.EnableRaisingEvents = true;
         }
-
-        private List<(FileSystemEventArgs, string)> source_list = new List<(FileSystemEventArgs, string)>();
-        private ConcurrentQueue<FileSystemEventArgs> eventQueue = new ConcurrentQueue<FileSystemEventArgs>();
-        private bool isCollecting = false;
-        private readonly object _lock = new object();
         public async void Bridge_Event(object sender, FileSystemEventArgs e)
         {
-            bool ext_chk = vm.FilterExt(e.FullPath);
-            if (!ext_chk) { return; }
+            (bool, bool) ext_chk = vm.FilterExt(e.FullPath);
             bool read_chk = vm.Read_Respone(e.FullPath, "Bridge_Event", e.ChangeType.ToString());
             if (!read_chk)
             {
-                Deleted_Exception(e);
+                if (System.IO.Path.GetExtension(e.FullPath).ToUpper() == ".DWG" || System.IO.Path.GetExtension(e.FullPath).ToUpper() == ".DWF")
+                {
+                    Deleted_Exception(e);
+                }
                 return;
             }
             else
@@ -92,6 +87,10 @@ namespace CadEye.Lib
             {
                 string path = item.Item2;
                 FileSystemEventArgs args = item.Item1;
+                if (uniqueEvents.TryGetValue(path, out var existingArgs) && existingArgs.ChangeType == WatcherChangeTypes.Renamed)
+                {
+                    continue;
+                }
                 uniqueEvents[path] = args;
             }
 
@@ -102,6 +101,7 @@ namespace CadEye.Lib
 
             return uniqueEvents.Values.ToList();
         }
+
         public void Deleted_Exception(FileSystemEventArgs e)
         {
             // Deleted
@@ -116,9 +116,9 @@ namespace CadEye.Lib
             var child_node = DatabaseProvider.Child_Node;
             var target_node = child_node.FindOne(x => x.File_FullName == e.FullPath);
 
-            var foldername = Path.GetDirectoryName(target_node.File_FullName);
-            var relative = Path.GetFileName(foldername);
-            var relativefilename = Path.Combine(relative, Path.GetFileName(target_node.File_FullName));
+            var foldername = System.IO.Path.GetDirectoryName(target_node.File_FullName);
+            var relative = System.IO.Path.GetFileName(foldername);
+            var relativefilename = System.IO.Path.Combine(relative, System.IO.Path.GetFileName(target_node.File_FullName));
             var source_node = new Child_File();
 
             source_node.Key = target_node.Key;
@@ -146,6 +146,7 @@ namespace CadEye.Lib
             string result = $"Deleted Succed, {e.FullPath}";
             vm.Event_History_Add(result);
         }
+
         public async Task Brdige_Queue()
         {
             while (true)
@@ -165,34 +166,108 @@ namespace CadEye.Lib
                         DateTime.Now.Second
                     );
 
-                    bool complete_chk = false;
-
-                    switch (e.ChangeType)
+                    (bool, bool) folder_chk = vm.FilterExt(e.FullPath);
+                    if (folder_chk.Item2)
                     {
-                        case WatcherChangeTypes.Created:
-                            complete_chk = File_A(e, time);
-                            break;
-                        case WatcherChangeTypes.Changed:
-                            complete_chk = File_A(e, time);
-                            break;
-                        case WatcherChangeTypes.Renamed:
-                            complete_chk = File_B(e, time);
-                            break;
-                    }
+                        bool complete_chk = false;
 
-                    if (!complete_chk)
+                        switch (e.ChangeType)
+                        {
+                            case WatcherChangeTypes.Renamed:
+                                complete_chk = Folder_B(e, time);
+                                break;
+                        }
+
+                        if (!complete_chk)
+                        {
+                            result = $"Folder_WorkFlow Failed. {e.FullPath}";
+                            vm.Event_History_Add(result);
+                        }
+                    }
+                    else
                     {
-                        result = $"WorkFlow Failed. {e.FullPath}";
-                        vm.Event_History_Add(result);
-                    }
+                        bool complete_chk = false;
 
+                        switch (e.ChangeType)
+                        {
+                            case WatcherChangeTypes.Created:
+                                complete_chk = File_A(e, time);
+                                break;
+                            case WatcherChangeTypes.Changed:
+                                complete_chk = File_A(e, time);
+                                break;
+                            case WatcherChangeTypes.Renamed:
+                                complete_chk = File_B(e, time);
+                                break;
+                        }
+
+                        if (!complete_chk)
+                        {
+                            result = $"File_WorkFlow Failed. {e.FullPath}";
+                            vm.Event_History_Add(result);
+                        }
+                    }
                     await Task.Delay(100);
-                    // return; 리턴쓰면 오류걸림
+                    // return; 리턴쓰면 q 전체를 빠져나가서 오류걸림
                 }
                 else
                 {
                     await Task.Delay(100);
                 }
+            }
+        }
+        private bool Folder_B(FileSystemEventArgs e, DateTime time)
+        {
+            try
+            {
+                var re = e as RenamedEventArgs;
+                var target_nodes = DatabaseProvider.Child_Node.FindAll().Where(x => x.File_Directory == re.OldFullPath);
+                var source_node = new Child_File();
+
+                if (target_nodes.Count() == 0)
+                {
+                    string result = $"Folder Renamed Result Succed : {e.FullPath}";
+                    vm.Event_History_Add(result);
+                    return true;
+                }
+                foreach (var target_node in target_nodes)
+                {
+                    string fullname = target_node.File_FullName.Replace(re.OldFullPath, e.FullPath);
+                    var filename = System.IO.Path.GetFileName(fullname);
+                    byte[] has = file_check.Hash_Allocated_Unique(fullname);
+
+                    source_node.Key = target_node.Key;
+                    source_node.File_FullName = fullname;
+                    source_node.File_Name = filename;
+                    source_node.File_Directory = e.FullPath;
+                    source_node.HashToken = has;
+                    source_node.list = target_node.list;
+                    source_node.Feature = target_node.Feature;
+                    source_node.Event = target_node.Event;
+                    source_node.Image = target_node.Image;
+
+                    string Event = "Folder Renamed";
+                    source_node.Event.Add(new EventEntry
+                    {
+                        Key = source_node.Key,
+                        Time = time,
+                        Type = "Folder Renamed",
+                        Description = $"Pre Folder Name : {re.OldFullPath}"
+                    });
+
+                    string result = $"Folder Renamed Result Succed : {e.FullPath}";
+                    vm.Event_History_Add(result);
+
+                    bool check = _db.Child_File_Table(source_node, null, DbAction.Update);
+                    if (!check) return false;
+                    File_Copy(source_node.File_FullName, time, source_node.Key, Event);
+                    vm.File_input_Event();
+                }
+                return true;
+            }
+            catch (Exception)
+            {
+                return false;
             }
         }
         private bool File_A(FileSystemEventArgs e, DateTime time)
@@ -206,12 +281,11 @@ namespace CadEye.Lib
                 }
                 else
                 {
-
                     var child_node = DatabaseProvider.Child_Node;
                     var source_node = new Child_File();
                     long key = 0;
 
-                    string fileName = Path.GetFileName(e.FullPath);
+                    string fileName = System.IO.Path.GetFileName(e.FullPath);
                     string Event = "";
                     string result = "";
                     string relative = "";
@@ -230,9 +304,10 @@ namespace CadEye.Lib
                        file.LastAccessTime.Second
                     );
 
+
                     var target_node = child_node.FindOne(x => x.File_FullName == e.FullPath);
                     var target_node_hash = child_node.FindAll().FirstOrDefault(x => x.HashToken.SequenceEqual(has));
-                    var target_node_access = child_node.FindAll().Where(x => x.HashToken.SequenceEqual(has)).FirstOrDefault(x => x.AccesTime == access_time);
+                    var target_node_access = child_node.FindAll().FirstOrDefault(x => x.HashToken.SequenceEqual(has) && Math.Abs((x.AccesTime - access_time).TotalSeconds) < 1);
                     var allkeys = child_node.FindAll().Select(x => x.Key);
                     string fullName = e.FullPath;
                     // Created
@@ -267,9 +342,9 @@ namespace CadEye.Lib
                     else if ((target_node == null && target_node_hash != null) && target_node_access != null)
                     {
                         key = target_node_access.Key;
-                        var foldername = Path.GetDirectoryName(e.FullPath);
-                        relative = Path.GetFileName(foldername);
-                        relativefilename = Path.Combine(relative, Path.GetFileName(e.FullPath));
+                        var foldername = System.IO.Path.GetDirectoryName(e.FullPath);
+                        relative = System.IO.Path.GetFileName(foldername);
+                        relativefilename = System.IO.Path.Combine(relative, System.IO.Path.GetFileName(e.FullPath));
 
                         source_node = SettingSourceNode(fullName, key, has, target_node_access);
 
@@ -294,9 +369,9 @@ namespace CadEye.Lib
                     // Copyed
                     else if ((target_node == null && target_node_hash != null) && target_node_access == null)
                     {
-                        var foldername = Path.GetDirectoryName(target_node_hash.File_FullName);
-                        relative = Path.GetFileName(foldername);
-                        relativefilename = Path.Combine(relative, Path.GetFileName(target_node_hash.File_FullName));
+                        var foldername = System.IO.Path.GetDirectoryName(target_node_hash.File_FullName);
+                        relative = System.IO.Path.GetFileName(foldername);
+                        relativefilename = System.IO.Path.Combine(relative, System.IO.Path.GetFileName(target_node_hash.File_FullName));
 
                         key = allkeys.Any() ? allkeys.Max() + 1 : 1;
 
@@ -432,8 +507,8 @@ namespace CadEye.Lib
             var source_node = new Child_File();
             source_node.Key = key;
             source_node.File_FullName = fullName;
-            source_node.File_Name = Path.GetFileName(fullName);
-            source_node.File_Directory = Path.GetDirectoryName(fullName);
+            source_node.File_Name = System.IO.Path.GetFileName(fullName);
+            source_node.File_Directory = System.IO.Path.GetDirectoryName(fullName);
             source_node.AccesTime = access_time;
             source_node.HashToken = has;
             if (target_node != null)
@@ -473,14 +548,15 @@ namespace CadEye.Lib
                     if (target_node == null) return false;
 
                     var source_node = new Child_File();
-                    var filename = Path.GetFileName(e.FullPath);
+                    var filename = System.IO.Path.GetFileName(e.FullPath);
                     byte[] has = file_check.Hash_Allocated_Unique(e.FullPath);
 
                     source_node.Key = target_node.Key;
                     source_node.File_FullName = e.FullPath;
                     source_node.File_Name = filename;
-                    source_node.File_Directory = Path.GetDirectoryName(e.FullPath);
+                    source_node.File_Directory = System.IO.Path.GetDirectoryName(e.FullPath);
                     source_node.HashToken = has;
+                    source_node.AccesTime = target_node.AccesTime;
                     source_node.list = target_node.list;
                     source_node.Feature = target_node.Feature;
                     source_node.Event = target_node.Event;
@@ -542,12 +618,12 @@ namespace CadEye.Lib
                 {
                     var source_file = fullpath;
                     string baseDir = AppDomain.CurrentDomain.BaseDirectory;
-                    string target_folder = Path.Combine(baseDir, $"repository\\{Bridge.projectname}");
+                    string target_folder = System.IO.Path.Combine(baseDir, $"repository\\{Bridge.projectname}");
                     if (!Directory.Exists(target_folder))
                     {
                         Directory.CreateDirectory(target_folder);
                     }
-                    string target_file = Path.Combine(target_folder, $"{time:yyyy-MM-dd-HH-mm-ss}_{Event}_{key}.dwg");
+                    string target_file = System.IO.Path.Combine(target_folder, $"{time:yyyy-MM-dd-HH-mm-ss}_{Event}_{key}.dwg");
 
                     const int maxRetries = 5;
                     const int delayMs = 2000;
@@ -581,8 +657,7 @@ namespace CadEye.Lib
 
             }
         }
-        // --------------------------------------------------------------------------------- 저장소에 대한 감시
-        private ConcurrentQueue<FileSystemEventArgs> eventQueue_repository = new ConcurrentQueue<FileSystemEventArgs>();
+        // --------------------------------------------------------------------------------- 저장소 파일 감시
         public void SetupWatcher_repository(FileSystemWatcher _watcher)
         {
             Task.Run(Brdige_Queue_repository);
@@ -680,7 +755,7 @@ namespace CadEye.Lib
         }
         private (DateTime, string, long) file_name_parsing(FileSystemEventArgs e)
         {
-            string fileName = Path.GetFileName(e.FullPath);
+            string fileName = System.IO.Path.GetFileName(e.FullPath);
             string[] parts = fileName.Split('_');
             if (parts.Length < 3)
             {
