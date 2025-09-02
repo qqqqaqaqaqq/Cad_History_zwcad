@@ -115,7 +115,7 @@ namespace CadEye.Lib
             );
             var child_node = DatabaseProvider.Child_Node;
             var target_node = child_node.FindOne(x => x.File_FullName == e.FullPath);
-
+            if (target_node == null) { return; }
             var foldername = System.IO.Path.GetDirectoryName(target_node.File_FullName);
             var relative = System.IO.Path.GetFileName(foldername);
             var relativefilename = System.IO.Path.Combine(relative, System.IO.Path.GetFileName(target_node.File_FullName));
