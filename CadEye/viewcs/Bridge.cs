@@ -21,7 +21,6 @@ namespace CadEye.ViewCS
         public long Key { get; set; }
         public string FilePath { get; set; }
     }
-
     public class Event_History_Author
     {
         public string Event_Messages { get; set; }
@@ -459,12 +458,12 @@ namespace CadEye.ViewCS
                 var parentNode = _db.FindAll()
                   .FirstOrDefault(x => x.Key == selected.Key && x.Image.Any(ev => ev.Time == selected.Time));
 
-                if (parentNode == null || selected.Type == "Deleted")
+                if (parentNode == null || selected.Type == "Delete")
                 {
                     pdfpage2.ResetHost();
                     return;
                 }
-                if (parentNode != null && selected.Type != "Deleted")
+                if (parentNode != null && selected.Type != "Delete")
                 {
                     Application.Current.Dispatcher.Invoke(() =>
                     {

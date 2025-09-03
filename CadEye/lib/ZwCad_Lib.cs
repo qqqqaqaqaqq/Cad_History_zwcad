@@ -13,10 +13,6 @@ namespace CadEye.Lib
 {
     public class ZwCad_Lib
     {
-        /// <summary>
-        /// 지더블유 캐드 text 파일 추출
-        /// 반환 (string[],string[])
-        /// </summary>
         public (List<string>, List<string>) WorkFlow_Zwcad(string path)
         {
             try

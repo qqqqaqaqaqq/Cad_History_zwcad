@@ -8,7 +8,6 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Windows.Shapes;
 
 namespace CadEye.Lib
 {
@@ -87,10 +86,7 @@ namespace CadEye.Lib
             {
                 string path = item.Item2;
                 FileSystemEventArgs args = item.Item1;
-                if (uniqueEvents.TryGetValue(path, out var existingArgs) && existingArgs.ChangeType == WatcherChangeTypes.Renamed)
-                {
-                    continue;
-                }
+                Ctrl_Z_Exception(item.Item1);
                 uniqueEvents[path] = args;
             }
 
@@ -102,6 +98,46 @@ namespace CadEye.Lib
             return uniqueEvents.Values.ToList();
         }
 
+        public void Ctrl_Z_Exception(FileSystemEventArgs e)
+        {
+            (bool, bool) ext_chk = vm.FilterExt(e.FullPath);
+            if (!ext_chk.Item2)
+            {
+                if (e.ChangeType == WatcherChangeTypes.Renamed)
+                {
+                    var re = e as RenamedEventArgs;
+                    var file = new FileInfo(e.FullPath);
+                    var target_node = DatabaseProvider.Child_Node.FindOne(x => x.File_FullName == re.OldFullPath);
+                    if (target_node == null) return;
+
+                    var source_node = new Child_File();
+                    var filename = System.IO.Path.GetFileName(e.FullPath);
+                    byte[] has = file_check.Hash_Allocated_Unique(e.FullPath);
+
+                    DateTime access_time = new DateTime(
+                       file.LastAccessTime.Year,
+                       file.LastAccessTime.Month,
+                       file.LastAccessTime.Day,
+                       file.LastAccessTime.Hour,
+                       file.LastAccessTime.Minute,
+                       file.LastAccessTime.Second
+                    );
+
+                    source_node.Key = target_node.Key;
+                    source_node.File_FullName = target_node.File_FullName;
+                    source_node.File_Name = target_node.File_Name;
+                    source_node.File_Directory = target_node.File_Directory;
+                    source_node.HashToken = has;
+                    source_node.AccesTime = access_time;
+                    source_node.list = target_node.list;
+                    source_node.Feature = target_node.Feature;
+                    source_node.Event = target_node.Event;
+                    source_node.Image = target_node.Image;
+
+                    _db.Child_File_Table(source_node, null, DbAction.Update);
+                }
+            }
+        }
         public void Deleted_Exception(FileSystemEventArgs e)
         {
             // Deleted
@@ -132,18 +168,18 @@ namespace CadEye.Lib
             source_node.Event = target_node.Event;
             source_node.Image = target_node.Image;
             source_node.Detele_Check = 1;
-            string Event = "Deleted";
+            string Event = "Delete";
 
             source_node.Event.Add(new EventEntry()
             {
                 Key = source_node.Key,
                 Time = time,
                 Type = Event,
-                Description = $"Deleted : {relativefilename}"
+                Description = $"Delete : {relativefilename}"
             });
 
             _db.Child_File_Table(source_node, null, DbAction.Update);
-            string result = $"Deleted Succed, {e.FullPath}";
+            string result = $"Delete Succed, {e.FullPath}";
             vm.Event_History_Add(result);
         }
 
@@ -187,7 +223,6 @@ namespace CadEye.Lib
                     else
                     {
                         bool complete_chk = false;
-
                         switch (e.ChangeType)
                         {
                             case WatcherChangeTypes.Created:
@@ -226,7 +261,7 @@ namespace CadEye.Lib
 
                 if (target_nodes.Count() == 0)
                 {
-                    string result = $"Folder Renamed Result Succed : {e.FullPath}";
+                    string result = $"Folder Rename Result Succed : {e.FullPath}";
                     vm.Event_History_Add(result);
                     return true;
                 }
@@ -246,16 +281,16 @@ namespace CadEye.Lib
                     source_node.Event = target_node.Event;
                     source_node.Image = target_node.Image;
 
-                    string Event = "Folder Renamed";
+                    string Event = "Folder Rename";
                     source_node.Event.Add(new EventEntry
                     {
                         Key = source_node.Key,
                         Time = time,
-                        Type = "Folder Renamed",
+                        Type = Event,
                         Description = $"Pre Folder Name : {re.OldFullPath}"
                     });
 
-                    string result = $"Folder Renamed Result Succed : {e.FullPath}";
+                    string result = $"Folder Rename Result Succed : {e.FullPath}";
                     vm.Event_History_Add(result);
 
                     bool check = _db.Child_File_Table(source_node, null, DbAction.Update);
@@ -321,7 +356,7 @@ namespace CadEye.Lib
                         source_node.Event = new List<EventEntry>();
                         source_node.Image = new List<ImageEntry>();
 
-                        Event = "Created";
+                        Event = "Creat";
 
                         source_node.Event.Add(new EventEntry()
                         {
@@ -330,7 +365,7 @@ namespace CadEye.Lib
                             Type = Event,
                         });
 
-                        result = $"File_A Created Succed, {e.FullPath}";
+                        result = $"File_A Create Succed, {e.FullPath}";
                         vm.Event_History_Add(result);
 
                         _db.Child_File_Table(source_node, null, DbAction.Insert);
@@ -348,7 +383,7 @@ namespace CadEye.Lib
 
                         source_node = SettingSourceNode(fullName, key, has, target_node_access);
 
-                        Event = "Moved";
+                        Event = "Move";
 
                         source_node.Event.Add(new EventEntry()
                         {
@@ -358,7 +393,7 @@ namespace CadEye.Lib
                             Description = $"Origin Address : {relativefilename}",
                         });
 
-                        result = $"File_A Moved Succed, {e.FullPath}";
+                        result = $"File_A Move Succed, {e.FullPath}";
                         vm.Event_History_Add(result);
 
                         _db.Child_File_Table(source_node, null, DbAction.Update);
@@ -384,7 +419,7 @@ namespace CadEye.Lib
                             source_node.Image = new List<ImageEntry>();
                         }
 
-                        Event = "Copyed";
+                        Event = "Copy";
 
                         source_node.Event.Add(new EventEntry()
                         {
@@ -395,7 +430,7 @@ namespace CadEye.Lib
                         });
 
                         {
-                            result = $"File_A Copyed Succed, {e.FullPath}";
+                            result = $"File_A Copy Succed, {e.FullPath}";
                             vm.Event_History_Add(result);
 
                             _db.Child_File_Table(source_node, null, DbAction.Insert);
@@ -438,7 +473,7 @@ namespace CadEye.Lib
 
                         source_node = SettingSourceNode(fullName, key, has, target_node);
 
-                        Event = "No-Changed";
+                        Event = "No-Change";
 
                         source_node.Event.Add(new EventEntry()
                         {
@@ -448,7 +483,7 @@ namespace CadEye.Lib
                             Description = "HashToken matches"
                         });
 
-                        result = $"File_A No-Changed Succed, {e.FullPath}";
+                        result = $"File_A No-Change Succed, {e.FullPath}";
                         vm.Event_History_Add(result);
 
                         {
@@ -464,7 +499,7 @@ namespace CadEye.Lib
                         key = target_node.Key;
 
                         source_node = SettingSourceNode(fullName, key, has, target_node);
-                        Event = "Changed";
+                        Event = "Change";
 
                         source_node.Event.Add(new EventEntry()
                         {
@@ -473,7 +508,7 @@ namespace CadEye.Lib
                             Type = Event,
                         });
 
-                        result = $"File_A Changed Succed, {e.FullPath}";
+                        result = $"File_A Change Succed, {e.FullPath}";
                         vm.Event_History_Add(result);
 
                         {
@@ -535,7 +570,7 @@ namespace CadEye.Lib
                 bool read_chk = vm.Read_Respone(e.FullPath, "File_B");
                 if (!read_chk)
                 {
-                    string result = $"Renamed Result Filed : {e.FullPath}";
+                    string result = $"Rename Result Filed : {e.FullPath}";
                     vm.Event_History_Add(result);
 
                     return false;
@@ -562,16 +597,16 @@ namespace CadEye.Lib
                     source_node.Event = target_node.Event;
                     source_node.Image = target_node.Image;
 
-                    string Event = "Renamed";
+                    string Event = "Rename";
                     source_node.Event.Add(new EventEntry
                     {
                         Key = source_node.Key,
                         Time = time,
-                        Type = "Renamed",
+                        Type = Event,
                         Description = $"Pre Name : {re.OldFullPath}"
                     });
 
-                    string result = $"Renamed Result Succed : {e.FullPath}";
+                    string result = $"Rename Result Succed : {e.FullPath}";
                     vm.Event_History_Add(result);
 
                     _db.Child_File_Table(source_node, null, DbAction.Update);
