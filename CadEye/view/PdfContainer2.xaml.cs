@@ -1,5 +1,4 @@
 ﻿using CadEye.ViewCS;
-using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Forms.Integration;
 
@@ -10,12 +9,13 @@ namespace CadEye.View
     /// </summary>
     public partial class PdfContainer2 : UserControl
     {
-        public Bridge vm { get; set; }
+        private Bridge _vm { get; set; }
+
         public PdfContainer2()
         {
             InitializeComponent();
-            vm = Bridge.Instance;
-            this.DataContext = vm;
+            _vm = Bridge.Instance;
+            this.DataContext = _vm;
         }
 
         WindowsFormsHost allhost;
@@ -27,11 +27,6 @@ namespace CadEye.View
         public void ResetHost()
         {
             Pdf_Grid2.Children.Clear();
-        }
-
-        private async void Pdf_Compare(object sender, RoutedEventArgs e)
-        {
-            await vm.Pdf_Compare_btn();
         }
     }
 }

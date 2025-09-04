@@ -13,7 +13,11 @@
             <RowDefinition Height="50"/>
         </Grid.RowDefinitions>
 
-        <Grid Grid.Row="0" x:Name="Pdf_Grid2" Background="Transparent"/>
-        <Button Grid.Row="3" Content="C O M P A R E" Style="{StaticResource Button_Glass}" Click="Pdf_Compare"/>
+        <Grid Grid.Row="0" x:Name="Pdf_Grid2" 
+              Background="Transparent"/>
+        <Button Grid.Row="3" 
+                Content="C O M P A R E" 
+                Style="{StaticResource Button_Glass}" 
+                Command="{Binding Compare_Pdf_Command}"/>
     </Grid>
 </UserControl>

@@ -1,65 +1,42 @@
 ﻿using CadEye.Lib;
-using CadEye.View;
+using CadEye.ViewCs;
 using CadEye.ViewCS;
 using System;
+using System.Drawing;
 using System.IO;
 using System.Threading;
 using System.Windows;
+using System.Windows.Forms;
 using System.Windows.Input;
 using System.Windows.Media;
 
 namespace CadEye
 {
-    /// <summary>
-    /// MainWindow.xaml에 대한 상호 작용 논리
-    /// </summary>
     public partial class MainWindow : Window
     {
-        public Bridge vm { get; set; }
+        private Bridge _vb { get; set; }
+        private FunctionCollection _functionCollection { get; set; }
+        public static bool isManger;
+
         public MainWindow()
         {
             InitializeComponent();
-            vm = Bridge.Instance;
-            this.DataContext = vm;
+            _vb = Bridge.Instance;
+            _functionCollection = FunctionCollection.Instance;
+            this.DataContext = _vb;
             this.Loaded += MainWindow_Loaded;
             this.Closing += MainWindow_Closing;
-            Bridge.Instance.pdfpage = Pdf_Viewer;
-            Bridge.Instance.pdfpage2 = Pdf_Viewer2;
+            Bridge.Instance.Pdf1 = Pdf_Viewer;
+            Bridge.Instance.Pdf2 = Pdf_Viewer2;
         }
-        private void Left_Click(object sender, MouseButtonEventArgs e)
-        {
-            this.DragMove();
-            if (e.ClickCount == 2)
-            {
-                if (this.WindowState == WindowState.Normal)
-                    this.WindowState = WindowState.Maximized;
-                else if (this.WindowState == WindowState.Maximized)
-                    this.WindowState = WindowState.Normal;
-            }
-        }
-        private void Form_Closed(object sender, EventArgs e)
-        {
-            System.Windows.Application.Current.Shutdown(0);
-        }
-        private void Image_Hover(object sender, System.Windows.Input.MouseEventArgs e)
-        {
-            if (sender is System.Windows.Controls.Image img)
-            {
-                if (e.RoutedEvent == Mouse.MouseEnterEvent)
-                    img.RenderTransform = new ScaleTransform(1.1, 1.1);
-                else if (e.RoutedEvent == Mouse.MouseLeaveEvent)
-                    img.RenderTransform = new ScaleTransform(1, 1);
-            }
-        }
-        public static bool isManger;
-        public Cad_FileView fileview = new Cad_FileView();
-        public void MainWindow_Loaded(object sender, RoutedEventArgs e)
+
+        public async void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
             try
             {
-                vm.Path_Setting();
+                _functionCollection.Path_Setting();
 
-                var result = MessageBox.Show(
+                var result = System.Windows.MessageBox.Show(
                     "Manger Mode?",
                     "알림",
                     MessageBoxButton.YesNo,
@@ -68,11 +45,12 @@ namespace CadEye
 
                 if (result == MessageBoxResult.Yes)
                 {
-                    DatabaseProvider.Initialize(true, Bridge.projectname);
+                    DatabaseProvider.Initialize(true, _vb.projectname);
                     isManger = true;
-                    fileview.FolderSearch_btn(sender, e);
-                    vm.FolderWatcher();
-                    vm.FolderWatcher_repository();
+                    await _functionCollection.MainView_Start_Load();
+                    await _functionCollection.File_View_input();
+                    _functionCollection.FolderWatcher();
+                    _functionCollection.FolderWatcher_repository();
                 }
                 else
                 {
@@ -93,10 +71,10 @@ namespace CadEye
             {
                 DatabaseProvider.Dispose();
 
-                if (vm.user_file != null)
+                if (_vb.user_file != null)
                 {
-                    File.Delete(vm.user_file);
-                    File.Delete(vm.user_log);
+                    File.Delete(_vb.user_file);
+                    File.Delete(_vb.user_log);
                     Thread.Sleep(1000);
                 }
             }
@@ -120,6 +98,38 @@ namespace CadEye
             Main.Visibility = Visibility.Hidden;
             Home.Visibility = Visibility.Hidden;
             Authority.Visibility = Visibility.Visible;
+        }
+
+
+        private NotifyIcon _trayIcon;
+        private void Traybutton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_trayIcon == null)
+            {
+                _trayIcon = new NotifyIcon();
+                string iconPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "icon.ico");
+                _trayIcon.Icon = new Icon(iconPath);
+                _trayIcon.Visible = true;
+                _trayIcon.Text = "My WPF App";
+
+                _trayIcon.MouseClick += (s, args) =>
+                {
+                    if (args.Button == MouseButtons.Left)
+                    {
+                        this.Show();
+                        this.WindowState = WindowState.Normal;
+                    }
+                };
+
+                _trayIcon.ContextMenuStrip = new ContextMenuStrip();
+                _trayIcon.ContextMenuStrip.Items.Add("Exit", null, (s, args) =>
+                {
+                    _trayIcon.Visible = false;
+                    System.Windows.Application.Current.Shutdown();
+                });
+            }
+
+            this.Hide();
         }
     }
 }

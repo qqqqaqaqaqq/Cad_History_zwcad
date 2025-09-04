@@ -69,7 +69,7 @@
         <Setter Property="HorizontalContentAlignment" Value="Center"/>
         <Setter Property="VerticalContentAlignment" Value="Center"/>
     </Style>
-    
+
     <!-- Glass-->
     <Style x:Key="GlassBorder" TargetType="Border">
         <Setter Property="Background">
@@ -97,8 +97,8 @@
         <Setter Property="FontWeight" Value="Bold"/>
         <Setter Property="Background" Value="#444444"/>
     </Style>
-    
-    
+
+
     <!-- Data-Grid-->
     <Style x:Key="Data_Gaid_Background" TargetType="DataGrid">
         <Setter Property="Background" Value="#1C1C1C"/>
@@ -125,7 +125,7 @@
             </Trigger>
         </Style.Triggers>
     </Style>
-    
+
     <Style x:Key="Data_Grid_Cell" TargetType="DataGridCell">
         <Setter Property="Foreground" Value="White"/>
         <Setter Property="Background" Value="#1C1C1C"/>
@@ -148,5 +148,16 @@
         <Setter Property="VerticalAlignment" Value="Center"/>
         <Setter Property="Margin" Value="5,0,0,0"/>
     </Style>
-    
+
+
+    <Style x:Key="SearchTextBoxStyle" TargetType="TextBox">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Foreground" Value="Gray"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="FontWeight" Value="Bold"/>
+        <Setter Property="FontFamily" Value="Segoe UI"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+        <Setter Property="HorizontalAlignment" Value="Stretch"/>
+    </Style>
+
 </ResourceDictionary>

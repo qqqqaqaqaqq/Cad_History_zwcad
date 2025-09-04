@@ -1,5 +1,4 @@
-﻿using CadEye.Lib;
-using CadEye.ViewCS;
+﻿using CadEye.ViewCS;
 using System.Windows.Controls;
 
 
@@ -10,21 +9,13 @@ namespace CadEye.View
     /// </summary>
     public partial class File_Watcher_View : UserControl
     {
-        public Bridge vm { get; set; }
-        public Pdf_ium_Viewer PdfBit = new Pdf_ium_Viewer();
+        private Bridge _vm { get; set; }
 
         public File_Watcher_View()
         {
             InitializeComponent();
-            vm = Bridge.Instance;
-            this.DataContext = vm;
-        }
-        private void Grid_Cell_Selected(object sender, SelectedCellsChangedEventArgs e)
-        {
-            if (FildData_Grid.SelectedItem is EventEntry selected)
-            {
-                vm.Pdf_Load_btn2(selected);
-            }
+            _vm = Bridge.Instance;
+            this.DataContext = _vm;
         }
     }
 }

@@ -1,4 +1,5 @@
-﻿using CadEye.ViewCS;
+﻿using CadEye.ViewCs;
+using CadEye.ViewCS;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -12,15 +13,21 @@ namespace CadEye.Lib
 {
     public class File_Check
     {
-        private Data_base _db = new Data_base();
-        public Bridge vm
+        public Bridge _vb
         {
             get { return Bridge.Instance; }
         }
+        public FunctionCollection _functionCollection
+        {
+            get { return FunctionCollection.Instance; }
+        }
+
+        private Data_base _db = new Data_base();
         public void Setting()
         {
             _db.Child_File_Table(null, null, DbAction.DeleteAll);
         }
+
         public ConcurrentBag<Child_File> AllocateData(string path)
         {
             if (path == null) { return null; }
@@ -70,10 +77,10 @@ namespace CadEye.Lib
         }
         public byte[] Hash_Allocated_Unique(string fullName)
         {
-            bool check = vm.Read_Respone(fullName, "Hash_Allocated_Unique_Filename");
+            bool check = _functionCollection.Read_Respone(fullName, "Hash_Allocated_Unique_Filename");
             if (!check) { return null; }
             {
-                var foldername = vm.folderpath;
+                var foldername = _vb.folderpath;
                 var fileName = Path.GetFileName(fullName);
 
                 if (fileName.StartsWith("~$"))

@@ -199,7 +199,12 @@
       <SubType>Designer</SubType>
     </ApplicationDefinition>
     <Compile Include="lib\File_Watcher.cs" />
+    <Compile Include="lib\Open_folderdialog.cs" />
+    <Compile Include="ViewCs\AsyncCommand.cs" />
+    <Compile Include="ViewCs\AsyncCommandT.cs" />
     <Compile Include="ViewCs\Bridge.cs" />
+    <Compile Include="ViewCs\FunctionCollection.cs" />
+    <Compile Include="ViewCs\RelayCommand.cs" />
     <Compile Include="View\AuthorityPage.xaml.cs">
       <DependentUpon>AuthorityPage.xaml</DependentUpon>
     </Compile>
@@ -228,8 +233,6 @@
     </Compile>
     <Compile Include="lib\Data_base.cs" />
     <Compile Include="lib\File_Check.cs" />
-    <Compile Include="lib\Open_filedialog.cs" />
-    <Compile Include="lib\Open_folderdialog.cs" />
     <Compile Include="lib\Pdf_ium_Viewer.cs" />
     <Compile Include="lib\ZwCad_Lib.cs" />
     <Compile Include="MainWindow.xaml.cs">
@@ -338,7 +341,9 @@
     </BootstrapperPackage>
   </ItemGroup>
   <ItemGroup>
-    <Resource Include="icon.ico" />
+    <Resource Include="icon.ico">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Resource>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">

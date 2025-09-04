@@ -14,6 +14,10 @@
         </Grid.RowDefinitions>
 
         <Grid Grid.Row="0" x:Name="Pdf_Grid" Background="Transparent"/>
-        <Button Grid.Row="3" Content="I M A G E  N E W  F O R M" Style="{StaticResource Button_Glass}" Click="Image_Form"/>
+        <Button 
+            Grid.Row="3" 
+            Content="I M A G E  N E W  F O R M" 
+            Style="{StaticResource Button_Glass}" 
+            Command="{Binding ViewForm_Command}"/>
     </Grid>
 </UserControl>

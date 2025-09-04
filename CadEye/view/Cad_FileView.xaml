@@ -19,7 +19,6 @@
             <RowDefinition Height="5"/>
             <RowDefinition Height="30"/>
         </Grid.RowDefinitions>
-        <!-- <Button Grid.Row="0" Content="Search" Click="FolderSearch_btn" Style="{StaticResource Button_Glass}" ></Button> -->
 
         <Grid Grid.Row="1">
             <Grid.RowDefinitions>
@@ -32,49 +31,46 @@
             </Grid.RowDefinitions>
 
             <Border Grid.Row="1" Background="#444444" CornerRadius="5" HorizontalAlignment="Stretch" Height="25" Padding="0">
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="5"/>
-                        <ColumnDefinition Width="auto"/>
-                        <ColumnDefinition Width="5"/>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="5"/>
-                    </Grid.ColumnDefinitions>
-                    <Button FontFamily="Segoe MDL2 Assets" Grid.Column="1" Content="&#xE721;" HorizontalAlignment="Right" Background="Transparent" 
-               HorizontalContentAlignment="Center" VerticalContentAlignment="Center" FontSize="13" Foreground="White" BorderThickness="0" />
-                    <TextBox x:Name="Tag_SearchText" BorderThickness="0" Grid.Column="3" KeyDown="Tag_Enter_Search" TextChanged="Overlay_Tag"
-                   Background="Transparent" FontSize="15" VerticalAlignment="Center" Foreground="White" FontFamily="Segoe UI"/>
-                    <TextBox x:Name="PlaceHolder_Overlay_Tag" Text="Tag" Grid.Column="3" VerticalAlignment="Center" HorizontalAlignment="Left"
-                             Background="Transparent" Foreground="Gray" BorderThickness="0" FontWeight="Bold" FontFamily="Segoe UI"/>
+                <Grid Margin="5,0,5,0">
+                    <TextBox
+                        x:Name="Tag_SearchText"
+                        Text="{Binding TagText, UpdateSourceTrigger=PropertyChanged}"
+                        Style="{StaticResource SearchTextBoxStyle}">
+                        <TextBox.InputBindings>
+                            <KeyBinding 
+                                Key="Enter" 
+                                Command="{Binding Tag_Enter_Search_Command}" 
+                                CommandParameter="{Binding TagText}"/>
+                        </TextBox.InputBindings>
+                    </TextBox>
                 </Grid>
             </Border>
 
             <Border Grid.Row="3" Background="#444444" CornerRadius="5" HorizontalAlignment="Stretch" Height="25" Padding="0">
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="5"/>
-                        <ColumnDefinition Width="auto"/>
-                        <ColumnDefinition Width="5"/>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="5"/>
-                    </Grid.ColumnDefinitions>
-                    <Button FontFamily="Segoe MDL2 Assets" Grid.Column="1" Content="&#xE721;" HorizontalAlignment="Right" Background="Transparent"
-               HorizontalContentAlignment="Center" VerticalContentAlignment="Center" FontSize="13" Foreground="White" BorderThickness="0" />
-                    <TextBox x:Name="File_SearchText" BorderThickness="0" Grid.Column="3" KeyDown="File_Name_Enter_Search" TextChanged="Overlay_FileName"
-                   Background="Transparent" FontSize="15" VerticalAlignment="Center" Foreground="White" FontFamily="Segoe UI"/>
-                    <TextBox x:Name="PlaceHolder_Overlay_FileName" Text="File Name" Grid.Column="3" VerticalAlignment="Center" HorizontalAlignment="Left"
-                         Background="Transparent" Foreground="Gray" BorderThickness="0" FontWeight="Bold" FontFamily="Segoe UI"/>
+                <Grid Margin="5,0,5,0">
+                    <TextBox 
+                        x:Name="File_SearchText" 
+                        BorderThickness="0" 
+                        Text="{Binding FileText, UpdateSourceTrigger=PropertyChanged}"
+                        Style="{StaticResource SearchTextBoxStyle}">
+                        <TextBox.InputBindings>
+                            <KeyBinding 
+                                Key="Enter" 
+                                Command="{Binding Enter_Search_Command}" 
+                                CommandParameter="{Binding FileText}"/>
+                        </TextBox.InputBindings>
+                    </TextBox>
                 </Grid>
             </Border>
 
             <Border Grid.Row="5" >
                 <DataGrid x:Name="Child_Box" 
-                  VerticalAlignment="Top"
-                  Style="{StaticResource Data_Gaid_Background}"
-                  ColumnHeaderStyle ="{StaticResource Data_Grid_ColumnHeader}"
-                  CellStyle="{StaticResource Data_Grid_Cell}"
-                  ItemsSource="{Binding Files}"
-                  SelectedCellsChanged="File_List_Selecetd">
+                    VerticalAlignment="Top"
+                    Style="{StaticResource Data_Gaid_Background}"
+                    ColumnHeaderStyle ="{StaticResource Data_Grid_ColumnHeader}"
+                    CellStyle="{StaticResource Data_Grid_Cell}"
+                    ItemsSource="{Binding Files}"
+                    SelectedItem="{Binding SelectedFile, Mode=TwoWay}">
                     <DataGrid.Columns>
                         <DataGridTextColumn 
                             Header="No" 
@@ -88,24 +84,50 @@
                             Width="*"/>
                     </DataGrid.Columns>
                     <DataGrid.ContextMenu>
-                        <ContextMenu>
-                            <MenuItem Header="Open File" Click="Open_File"/>
-                            <MenuItem Header="Open Folder" Click="Open_Folder"/>
+                        <ContextMenu >
+                            <MenuItem Header="Open File" 
+                                Command="{Binding File_Open_Command}"
+                                CommandParameter="{Binding SelectedItem, RelativeSource={RelativeSource AncestorType=DataGrid}}"/>
+                            <MenuItem Header="Open Folder" 
+                                Command="{Binding Folder_Open_Command}"
+                                CommandParameter="{Binding SelectedItem, RelativeSource={RelativeSource AncestorType=DataGrid}}"/>
                         </ContextMenu>
                     </DataGrid.ContextMenu>
                 </DataGrid>
             </Border>
 
-            <Grid Grid.Row="5">
-                <Border  x:Name="Overlay" Background="#80000000" Visibility="Hidden">
-                    <TextBlock Text="로딩 중..." Foreground="White" FontSize="20" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                </Border>
-            </Grid>
         </Grid>
-        <Button Grid.Row="3" x:Name="DB_Write_btn" Visibility="Visible" Content="Tree Update" Click="Tree_Update" Style="{StaticResource Button_Glass}"></Button>
-        <Button Grid.Row="3" x:Name="DB_Read_btn" Visibility="Hidden" Content="Tree Update" Click="DB_Read" Style="{StaticResource Button_Glass}"></Button>
-        <Button Grid.Row="5" x:Name="DB_Update_btn" Content="DataBase Update" Click="DB_Update" Style="{StaticResource Button_Glass}"></Button>
-        <Button Grid.Row="7"  x:Name="DB_Backup_btn" Content="Data Back UP" Click="DB_Backup" Style="{StaticResource Button_Glass}"></Button>
-        <Button Grid.Row="9"  x:Name="DB_Reset_btn" Content="Data Reset" Click="Reset" Style="{StaticResource Button_Glass}"></Button>
+        <Button 
+            Grid.Row="3"
+            x:Name="DB_Write_btn"
+            Visibility="Visible"
+            Content="Tree Update" 
+            Command="{Binding Tree_Update_Command}"
+            Style="{StaticResource Button_Glass}"/>
+        <Button 
+            Grid.Row="3" 
+            x:Name="DB_Read_btn" 
+            Visibility="Hidden" 
+            Content="Tree Update"
+            Command="{Binding DB_Read_Command}"
+            Style="{StaticResource Button_Glass}"></Button>
+        <Button 
+            Grid.Row="5"
+            x:Name="DB_Update_btn" 
+            Content="DataBase Update"
+            Command="{Binding DB_Update_Command}"
+            Style="{StaticResource Button_Glass}"/>
+        <Button 
+            Grid.Row="7"  
+            x:Name="DB_Backup_btn" 
+            Content="{Binding BackupButtonText}"
+            Command="{Binding BackUp_Command}"
+            Style="{StaticResource Button_Glass}"/>
+        <Button 
+            Grid.Row="9" 
+            x:Name="DB_Reset_btn" 
+            Content="Reset"
+            Command="{Binding Reset_Command}"
+            Style="{StaticResource Button_Glass}"/>
     </Grid>
 </UserControl>

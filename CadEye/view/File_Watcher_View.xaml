@@ -15,7 +15,7 @@
                   ColumnHeaderStyle ="{StaticResource Data_Grid_ColumnHeader}"
                   CellStyle="{StaticResource Data_Grid_Cell}"
                   ItemsSource="{Binding File_History}"
-                  SelectedCellsChanged="Grid_Cell_Selected">
+                  SelectedItem="{Binding Selected_EventEntry_File, Mode=TwoWay}">
             <DataGrid.Columns>
                 <DataGridTextColumn 
                     Header="Occuretime" 

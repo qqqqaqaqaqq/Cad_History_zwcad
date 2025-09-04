@@ -15,12 +15,12 @@ namespace CadEye.View
 
     public partial class PdfContainer : UserControl
     {
-        public Bridge vm { get; set; }
+        public Bridge _vm { get; set; }
         public PdfContainer()
         {
             InitializeComponent();
-            vm = Bridge.Instance;
-            this.DataContext = vm;
+            _vm = Bridge.Instance;
+            this.DataContext = _vm;
         }
 
         WindowsFormsHost allhost;
@@ -45,10 +45,6 @@ namespace CadEye.View
             {
                 Pdf_Grid.Children.Clear();
             });
-        }
-        public void Image_Form(object sender, RoutedEventArgs e)
-        {
-            vm.OpenPdfInNewWindow();
         }
     }
 }

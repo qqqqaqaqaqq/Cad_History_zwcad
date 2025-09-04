@@ -28,10 +28,20 @@
                     <RowDefinition Height="40"/>
                     <RowDefinition Height="40"/>
                     <RowDefinition Height="40"/>
+                    <RowDefinition Height="40"/>
                 </Grid.RowDefinitions>
                 <Button Grid.Row="0" Margin="0,5,0,0" x:Name="Homebutton" Content="H" Style="{StaticResource Button_Glass}" FontSize="15" BorderThickness="0" Click="Homebutton_Click"/>
                 <Button Grid.Row="1" Margin="0,5,0,0" x:Name="Mainbutton" Content="M" Style="{StaticResource Button_Glass}" FontSize="15" BorderThickness="0" Click="Mainbutton_Click"/>
                 <Button Grid.Row="2" Margin="0,5,0,0" x:Name="Autobutton" Content="A" Style="{StaticResource Button_Glass}" FontSize="15" BorderThickness="0" Click="Authority_Click"/>
+                <Button 
+                    Grid.Row="3" 
+                    Margin="0,5,0,0"
+                    x:Name="Traybutton" 
+                    Content="T" 
+                    Style="{StaticResource Button_Glass}" 
+                    FontSize="15" 
+                    BorderThickness="0" 
+                    Command="{Binding Tray_Command}" Click="Traybutton_Click"/>
             </Grid>
         </Border>
 

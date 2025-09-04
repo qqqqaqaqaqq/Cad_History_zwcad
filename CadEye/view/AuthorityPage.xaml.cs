@@ -9,13 +9,15 @@ namespace CadEye.View
     /// </summary>
     public partial class AuthorityPage : UserControl
     {
-        public Bridge vm;
+        private Bridge _vm { get; set; }
 
         public AuthorityPage()
         {
-            InitializeComponent();
-            vm = Bridge.Instance;
-            this.DataContext = vm;
+            {
+                InitializeComponent();
+                _vm = Bridge.Instance;
+                this.DataContext = _vm;
+            }
         }
     }
 }
