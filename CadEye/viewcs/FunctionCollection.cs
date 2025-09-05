@@ -4,6 +4,7 @@ using LiteDB;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -12,6 +13,7 @@ using System.Threading.Tasks;
 using System.Windows.Controls;
 using System.Windows.Forms;
 using System.Windows.Forms.Integration;
+using static PdfSharp.Capabilities;
 
 namespace CadEye.ViewCs
 {
@@ -43,7 +45,6 @@ namespace CadEye.ViewCs
         public FileSystemWatcher _watcher;
         public FileSystemWatcher _watcher_repository;
 
-
         public async Task MainView_Start_Load()
         {
             await Task.Delay(1);
@@ -51,7 +52,6 @@ namespace CadEye.ViewCs
             ConcurrentBag<Child_File> item_insert = filecheck.AllocateData(_vb.folderpath);
             _db.Child_File_Table(null, item_insert, DbAction.AllUpsert);
         }
-
         public async Task Reset()
         {
             _db.Child_File_Table(null, null, DbAction.DeleteAll);
@@ -69,7 +69,6 @@ namespace CadEye.ViewCs
                 _vb.Pdf2.ResetHost();
             });
         }
-
         public async Task File_View_input()
         {
             var child_db = DatabaseProvider.Child_Node;
@@ -103,7 +102,6 @@ namespace CadEye.ViewCs
                 }
             });
         }
-
         public async Task Exclude_FileINFO()
         {
             var child_db = DatabaseProvider.Child_Node;
@@ -143,13 +141,12 @@ namespace CadEye.ViewCs
                         watcher.File_Copy(child_node.File_FullName, time, child_node.Key, Event);
                     }
                 }
-                catch (Exception ex) 
+                catch (Exception ex)
                 {
                     _vb.Event_History.Add(ex.Message);
                 }
             });
         }
-
         public async Task<bool> TryPrepareTempFiles()
         {
             Random random = new Random();
@@ -341,7 +338,6 @@ namespace CadEye.ViewCs
                 Debug.WriteLine($"Dubliclick_Open : {ex.Message}");
             }
         }
-
         public async Task Tag_Enter_SearchAsync(string text)
         {
             try
@@ -379,6 +375,55 @@ namespace CadEye.ViewCs
                 });
 
                 System.Windows.Application.Current.Dispatcher.Invoke(() =>
+                {
+                    _vb.Files.Clear();
+                    foreach (var file in filesWithKey)
+                    {
+                        _vb.Files.Add(file);
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Tag_Enter_SearchAsync : {ex.Message}");
+            }
+        }
+
+        public async Task File_Nmae_Enter_SearchAsync(string text)
+        {
+            try
+            {
+                string searchText = string.IsNullOrWhiteSpace(text) ? "" : text.Replace(" ", "").ToUpper();
+
+                var filesWithKey = await Task.Run(() =>
+                {
+                    var child_db = DatabaseProvider.Child_Node;
+                    var child_nodes = child_db.FindAll();
+
+                    if (!string.IsNullOrEmpty(searchText))
+                    {
+                        return child_nodes
+                            .Where(node => node.File_FullName.Replace(" ", "").ToUpper().Contains(searchText))
+                            .Select(node => new FileInfoItem
+                            {
+                                Key = node.Key,
+                                FilePath = node.File_FullName
+                            })
+                            .ToList();
+                    }
+                    else
+                    {
+                        return child_nodes
+                            .Select(node => new FileInfoItem
+                            {
+                                Key = node.Key,
+                                FilePath = node.File_FullName
+                            })
+                            .ToList();
+                    }
+                });
+
+                System.Windows.Application.Current.Dispatcher.Invoke(() =>
                   {
                       _vb.Files.Clear();
                       foreach (var file in filesWithKey)
@@ -389,7 +434,7 @@ namespace CadEye.ViewCs
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"Tag_Enter_SearchAsync : {ex.Message}");
+                Debug.WriteLine($"File_Name_Enter_SearchAsync : {ex.Message}");
             }
         }
 
@@ -465,34 +510,96 @@ namespace CadEye.ViewCs
             });
         }
 
-        public async Task LoadPdf_Compare(EventEntry selected)
+        public async Task TagRef_History_Container(EventEntry selected) // 수정
+        {
+            var _db = DatabaseProvider.Child_Node;
+            bool feature_progress = false;
+            bool list_progress = false;
+
+            Debug.WriteLine(selected.Key);
+            var cheks = _db.FindAll().Where(x => x.Key == selected.Key).Select(e => e.Feature_Hisotry);
+            foreach (var chk in cheks)
+            {
+                foreach (var ev in chk)
+                {
+                    foreach (string evstring in ev.Feature_line)
+                    {
+                        Debug.WriteLine(evstring);
+                    }
+                }
+            }
+
+            var feature_parentNode = await Task.Run(() => _db.FindAll()
+            .FirstOrDefault(x => x.Key == selected.Key && x.Feature_Hisotry.Any(ev => ev.Time == selected.Time)));
+            var list_parentNode = await Task.Run(() => _db.FindAll()
+            .FirstOrDefault(x => x.Key == selected.Key && x.List_History.Any(ev => ev.Time == selected.Time)));
+
+            if (feature_parentNode != null)
+                feature_progress = true;
+
+            if (list_parentNode != null)
+                list_progress = true;
+
+
+
+            if (selected.Type == "Delete" || selected.Type == "Deleted") return;
+
+
+            await System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
+            {
+                if (feature_progress)
+                {
+                    int feature_eventIndex = feature_parentNode.Feature_Hisotry.FindIndex(ev => ev.Time == selected.Time);
+
+                    if (feature_eventIndex >= 0)
+                    {
+                        var features = feature_parentNode.Feature_Hisotry[feature_eventIndex].Feature_line;
+                        foreach (var feature in features)
+                        {
+                            _vb.History_Tag.Add(feature);
+                        }
+                        ;
+                    }
+                }
+
+                if (list_progress)
+                {
+                    int list_eventIndex = list_parentNode.List_History.FindIndex(ev => ev.Time == selected.Time);
+                    if (list_eventIndex >= 0)
+                    {
+                        var lists = list_parentNode.List_History[list_eventIndex].List_line;
+                        foreach (var list in lists)
+                        {
+                            _vb.History_Ref.Add(list);
+                        }
+                    }
+                }
+            });
+        }
+
+        public async Task LoadPdf(EventEntry selected)
         {
             var _db = DatabaseProvider.Child_Node;
 
             var parentNode = await Task.Run(() => _db.FindAll()
               .FirstOrDefault(x => x.Key == selected.Key && x.Image.Any(ev => ev.Time == selected.Time)));
 
-            if (parentNode == null || selected.Type == "Delete" || selected.Type == "Deleted")
-            {
-                return;
-            }
-            if (parentNode != null && selected.Type != "Delete" && selected.Type != "Deleted")
-            {
-                await System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
-                {
-                    int eventIndex = parentNode.Image.FindIndex(ev => ev.Time == selected.Time);
+            if (parentNode == null || selected.Type == "Delete" || selected.Type == "Deleted") return;
 
-                    if (eventIndex >= 0 && eventIndex < parentNode.Image.Count)
-                    {
-                        var imageData = parentNode.Image[eventIndex].Data;
-                        _vb.Compare_Image = imageData;
-                        _vb.Host2 = PdfBit.Pdf_Created(imageData);
-                        _vb.Pdf1.SetHost(_vb.Host1);
-                        _vb.Pdf2.SetHost(_vb.Host2);
-                    }
-                    else return;
-                });
-            }
+            await System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
+            {
+                int eventIndex = parentNode.Image.FindIndex(ev => ev.Time == selected.Time);
+
+                if (eventIndex >= 0)
+                {
+                    var imageData = parentNode.Image[eventIndex].Data;
+                    _vb.Compare_Image = imageData;
+                    _vb.Host2 = PdfBit.Pdf_Created(imageData);
+                    _vb.Pdf1.SetHost(_vb.Host1);
+                    _vb.Pdf2.SetHost(_vb.Host2);
+                }
+                else return;
+            });
         }
 
         public async Task LoadPdf_Current()
@@ -557,6 +664,15 @@ namespace CadEye.ViewCs
             {
                 _vb.Pdf1.ResetHost();
                 _vb.Pdf2.ResetHost();
+            });
+        }
+
+        public async Task TagRef_History_Reset()
+        {
+            await System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
+            {
+                _vb.History_Ref.Clear();
+                _vb.History_Tag.Clear();
             });
         }
 
@@ -696,7 +812,7 @@ namespace CadEye.ViewCs
                     var node = child_db.FindOne(x => x.File_FullName == path);
                     if (!File.Exists(path)) { continue; }
                     var file = new FileInfo(path);
-                    var source_node = Pdf_Bitmap_Indiviaul(time, node, node.File_FullName);
+                    var source_node = Pdf_Bitmap_Indiviaul(time, node, node.File_FullName, node.Key);
 
                     _db.Child_File_Table(source_node, null, DbAction.Upsert);
                 }
@@ -709,7 +825,7 @@ namespace CadEye.ViewCs
 
         // ====================================================
 
-        public Child_File Pdf_Bitmap_Indiviaul(DateTime time, Child_File source_node, string source_file)
+        public Child_File Pdf_Bitmap_Indiviaul(DateTime time, Child_File source_node, string source_file, long key)
         {
             bool check = Read_Respone(source_file, "Pdf_Bitmap_Indiviaul");
             if (!check) { return null; }
@@ -722,13 +838,11 @@ namespace CadEye.ViewCs
 
                     source_node.Image.Add(new ImageEntry
                     {
-                        Key = source_node.Key,
+                        Key = key,
                         Data = data,
                         Time = time
                     });
 
-                    if (source_node.Image.Count() == 0)
-                        Debug.WriteLine("1");
                     File.Delete(pathpdf);
                     return source_node;
                 }
@@ -736,7 +850,7 @@ namespace CadEye.ViewCs
             }
         }
 
-        public Child_File Extrude_Indiviaul(Child_File source_node, string source_file)
+        public Child_File Extrude_Indiviaul(DateTime time, Child_File source_node, string source_file, long key) // 수정 필요
         {
             bool check = Read_Respone(source_file, "Extrude_Indiviaul");
             if (!check) { return null; }
@@ -747,9 +861,22 @@ namespace CadEye.ViewCs
                 source_node.Feature = autocad_text.Item1;
                 source_node.list = autocad_text.Item2;
 
+                source_node.Feature_Hisotry.Add(new FeatureEntry
+                {
+                    Key = key,
+                    Time = time,
+                    Feature_line = source_node.Feature
+                });
+
+                source_node.List_History.Add(new ListEntry
+                {
+                    Key = key,
+                    Time = time,
+                    List_line = source_node.list
+                });
+
                 return source_node;
             }
         }
-
     }
 }

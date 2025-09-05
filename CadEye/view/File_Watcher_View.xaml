@@ -21,12 +21,12 @@
                     Header="Occuretime" 
                     Binding="{Binding Time}" 
                     ElementStyle ="{StaticResource Data_ElementStyle}"
-                    Width="200"/>
+                    Width="120"/>
                 <DataGridTextColumn 
                     Header="Event" 
                     Binding="{Binding Type}" 
                     ElementStyle ="{StaticResource Data_ElementStyle}"
-                    Width="120"/>
+                    Width="70"/>
                 <DataGridTextColumn 
                     Header="Reason" 
                     Binding="{Binding Description}" 

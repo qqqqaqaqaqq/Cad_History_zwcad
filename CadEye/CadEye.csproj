@@ -214,6 +214,9 @@
     <Compile Include="View\Cad_Text.xaml.cs">
       <DependentUpon>Cad_Text.xaml</DependentUpon>
     </Compile>
+    <Compile Include="View\Cad_Text_History.xaml.cs">
+      <DependentUpon>Cad_Text_History.xaml</DependentUpon>
+    </Compile>
     <Compile Include="View\File_Watcher_View.xaml.cs">
       <DependentUpon>File_Watcher_View.xaml</DependentUpon>
     </Compile>
@@ -254,6 +257,10 @@
     <Page Include="View\Cad_Text.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
+    </Page>
+    <Page Include="View\Cad_Text_History.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="View\File_Watcher_View.xaml">
       <Generator>MSBuild:Compile</Generator>

@@ -7,8 +7,6 @@ using System.IO;
 using System.Threading;
 using System.Windows;
 using System.Windows.Forms;
-using System.Windows.Input;
-using System.Windows.Media;
 
 namespace CadEye
 {
@@ -29,7 +27,6 @@ namespace CadEye
             Bridge.Instance.Pdf1 = Pdf_Viewer;
             Bridge.Instance.Pdf2 = Pdf_Viewer2;
         }
-
         public async void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
             try
@@ -99,8 +96,6 @@ namespace CadEye
             Home.Visibility = Visibility.Hidden;
             Authority.Visibility = Visibility.Visible;
         }
-
-
         private NotifyIcon _trayIcon;
         private void Traybutton_Click(object sender, RoutedEventArgs e)
         {
@@ -130,6 +125,25 @@ namespace CadEye
             }
 
             this.Hide();
+        }
+        private bool isExpanded = true;
+        private void SectionExpanded(object sender, RoutedEventArgs e)
+        {
+
+            if (!isExpanded)
+            {
+                this.Width = 700;
+                ColHistory.Width = new GridLength(0);
+                ColCurrent.Width = new GridLength(1, GridUnitType.Star);
+                isExpanded = true;
+            }
+            else
+            {
+                this.Width = 1400;
+                ColHistory.Width = new GridLength(1, GridUnitType.Star);
+                ColCurrent.Width = new GridLength(1, GridUnitType.Star);
+                isExpanded = false;
+            }
         }
     }
 }

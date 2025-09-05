@@ -423,6 +423,8 @@ namespace CadEye.Lib
                         {
                             source_node.list = new List<string>();
                             source_node.Feature = new List<string>();
+                            source_node.List_History = new List<ListEntry>();
+                            source_node.Feature_Hisotry = new List<FeatureEntry>();
                             source_node.Event = new List<EventEntry>();
                             source_node.Image = new List<ImageEntry>();
                         }
@@ -555,6 +557,8 @@ namespace CadEye.Lib
             {
                 source_node.list = target_node.list;
                 source_node.Feature = target_node.Feature;
+                source_node.Feature_Hisotry = target_node.Feature_Hisotry;
+                source_node.List_History = target_node.List_History;
                 source_node.Event = target_node.Event;
                 source_node.Image = target_node.Image;
             }
@@ -562,6 +566,8 @@ namespace CadEye.Lib
             {
                 source_node.list = new List<string>();
                 source_node.Feature = new List<string>();
+                source_node.List_History = new List<ListEntry>();
+                source_node.Feature_Hisotry = new List<FeatureEntry>();
                 source_node.Event = new List<EventEntry>();
                 source_node.Image = new List<ImageEntry>();
             }
@@ -600,6 +606,8 @@ namespace CadEye.Lib
                     source_node.AccesTime = target_node.AccesTime;
                     source_node.list = target_node.list;
                     source_node.Feature = target_node.Feature;
+                    source_node.List_History = target_node.List_History;
+                    source_node.Feature_Hisotry = target_node.Feature_Hisotry;
                     source_node.Event = target_node.Event;
                     source_node.Image = target_node.Image;
 
@@ -713,16 +721,17 @@ namespace CadEye.Lib
                     (DateTime, string, long) name_parts = file_name_parsing(e);
                     var source_node = new Child_File();
 
-
                     source_node.list = new List<string>();
                     source_node.Feature = new List<string>();
+                    source_node.List_History = new List<ListEntry>();
+                    source_node.Feature_Hisotry = new List<FeatureEntry>();
                     source_node.Event = new List<EventEntry>();
                     source_node.Image = new List<ImageEntry>();
 
                     int retry = 5;
                     while (retry > 0)
                     {
-                        source_node = Extrude_PDF(e, source_node, name_parts.Item1);
+                        source_node = Extrude_PDF(e, source_node, name_parts.Item1, name_parts.Item3);
 
                         if (source_node != null)
                             break;
@@ -736,8 +745,14 @@ namespace CadEye.Lib
 
                     if (File.Exists(target_node.File_FullName))
                     {
-                        var temp_source_node = new ImageEntry();
-                        temp_source_node = source_node.Image[0];
+                        var img_temp_source_node = new ImageEntry();
+                        var history_feature_temp = new FeatureEntry();
+                        var history_list_temp = new ListEntry();
+
+                        img_temp_source_node = source_node.Image[0];
+                        history_feature_temp = source_node.Feature_Hisotry[0];
+                        history_list_temp = source_node.List_History[0];
+
                         source_node.Key = target_node.Key;
                         source_node.File_FullName = target_node.File_FullName;
                         source_node.File_Name = target_node.File_Name;
@@ -746,10 +761,14 @@ namespace CadEye.Lib
                         source_node.HashToken = target_node.HashToken;
                         source_node.Event = target_node.Event;
                         source_node.Image = target_node.Image;
+                        source_node.Feature_Hisotry = target_node.Feature_Hisotry;
+                        source_node.List_History = target_node.List_History;
                         //===========================================
                         source_node.Feature = source_node.Feature;
                         source_node.list = source_node.list;
-                        source_node.Image.Add(temp_source_node);
+                        source_node.List_History.Add(history_list_temp);
+                        source_node.Feature_Hisotry.Add(history_feature_temp);
+                        source_node.Image.Add(img_temp_source_node);
                     }
 
                     _db.Child_File_Table(source_node, null, DbAction.Update);
@@ -789,14 +808,14 @@ namespace CadEye.Lib
             return (time, type, Number);
         }
 
-        private Child_File Extrude_PDF(FileSystemEventArgs e, Child_File source_node, DateTime time)
+        private Child_File Extrude_PDF(FileSystemEventArgs e, Child_File source_node, DateTime time, long key)
         {
             bool read_chk = _functionCollection.Read_Respone(e.FullPath, "Extrude_PDF");
 
             try
             {
-                source_node = _functionCollection.Extrude_Indiviaul(source_node, e.FullPath);
-                source_node = _functionCollection.Pdf_Bitmap_Indiviaul(time, source_node, e.FullPath);
+                source_node = _functionCollection.Extrude_Indiviaul(time, source_node, e.FullPath, key);
+                source_node = _functionCollection.Pdf_Bitmap_Indiviaul(time, source_node, e.FullPath, key);
                 return source_node;
             }
             catch

@@ -96,9 +96,19 @@
         <Setter Property="Foreground" Value="White"/>
         <Setter Property="FontWeight" Value="Bold"/>
         <Setter Property="Background" Value="#444444"/>
+        <Setter Property="Cursor" Value="Hand"/>
     </Style>
 
 
+    <ControlTemplate x:Key="RoundedButtonTemplate" TargetType="Button">
+        <Border Background="{TemplateBinding Background}" 
+                CornerRadius="6" 
+                BorderBrush="{TemplateBinding BorderBrush}" 
+                BorderThickness="{TemplateBinding BorderThickness}">
+            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+        </Border>
+    </ControlTemplate>
+    
     <!-- Data-Grid-->
     <Style x:Key="Data_Gaid_Background" TargetType="DataGrid">
         <Setter Property="Background" Value="#1C1C1C"/>
@@ -118,7 +128,7 @@
         <Setter Property="VerticalContentAlignment" Value="Center"/>
         <Setter Property="HorizontalContentAlignment" Value="Left"/>
         <Setter Property="Padding" Value="10,0,0,0"/>
-        <Setter Property="FontSize" Value="13"/>
+        <Setter Property="FontSize" Value="10"/>
         <Style.Triggers>
             <Trigger Property="IsMouseOver" Value="True">
                 <Setter Property="Background" Value="#333333"/>
@@ -131,7 +141,7 @@
         <Setter Property="Background" Value="#1C1C1C"/>
         <Setter Property="BorderBrush" Value="#444444"/>
         <Setter Property="BorderThickness" Value="0,0,1,1"/>
-        <Setter Property="FontSize" Value="13"/>
+        <Setter Property="FontSize" Value="10"/>
         <Setter Property="HorizontalContentAlignment" Value="Left"/>
         <Setter Property="VerticalContentAlignment" Value="Center"/>
         <Setter Property="SnapsToDevicePixels" Value="True"/>

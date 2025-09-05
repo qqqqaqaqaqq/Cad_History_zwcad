@@ -50,14 +50,28 @@ namespace CadEye.Lib
         public string Type { get; set; }
         public string Description { get; set; }
     }
+    public class FeatureEntry
+    {
+        public long Key { get; set; }
+        public DateTime Time { get; set; }
+        public List<string> Feature_line { get; set; }
+    }
+    public class ListEntry
+    {
+        public long Key { get; set; }
+        public DateTime Time { get; set; }
+        public List<string> List_line { get; set; }
+    }
     public class Child_File
     {
         public Child_File()
         {
             Image = new List<ImageEntry>();
             Event = new List<EventEntry>();
-            Feature = new List<string>();
+            Feature_Hisotry = new List<FeatureEntry>();
+            List_History = new List<ListEntry>();
             list = new List<string>();
+            Feature = new List<string>();
         }
 
         [BsonId]
@@ -67,8 +81,10 @@ namespace CadEye.Lib
         public string File_Directory { get; set; } = "";
         public DateTime AccesTime { get; set; } = DateTime.MinValue;
         public byte[] HashToken { get; set; }
-        public List<string> Feature { get; set; }
+        public List<FeatureEntry> Feature_Hisotry { get; set; }
+        public List<ListEntry> List_History { get; set; }
         public List<string> list { get; set; }
+        public List<string> Feature { get; set; }
         public List<EventEntry> Event { get; set; }
         public List<ImageEntry> Image { get; set; }
         public long Detele_Check { get; set; }
@@ -80,7 +96,7 @@ namespace CadEye.Lib
         DeleteAll,
         AllUpsert,
         Update,
-        Insert,  
+        Insert,
     }
     public class Data_base
     {

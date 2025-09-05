@@ -38,9 +38,11 @@ namespace CadEye.ViewCS
         public AsyncCommand DB_Read_Command { get; }
         public RelayCommand File_Open_Command { get; }
         public AsyncCommand Folder_Open_Command { get; }
-        public AsyncCommandT<string> Enter_Search_Command { get; }
+        public AsyncCommandT<string> Tag_Enter_Search_Command { get; }
         public AsyncCommand ViewForm_Command { get; }
-
+        public AsyncCommandT<string> File_Enter_Search_Command { get; }
+        public AsyncCommandT<string> History_Tag_Enter_Search_Command { get; }
+        public AsyncCommandT<string> History_Ref_Enter_Search_Command { get; }
         private static Bridge _instance;
         public static Bridge Instance
         {
@@ -69,8 +71,11 @@ namespace CadEye.ViewCS
             DB_Read_Command = new AsyncCommand(WorkFlow_DB_Read_Command);
             File_Open_Command = new RelayCommand(WorkFlow_File_Open_Command);
             Folder_Open_Command = new AsyncCommand(WorkFlow_Folder_Open_Command);
-            Enter_Search_Command = new AsyncCommandT<string>(WorkFlow_Tag_Enter_Search_Command);
+            Tag_Enter_Search_Command = new AsyncCommandT<string>(WorkFlow_Tag_Enter_Search_Command);
             ViewForm_Command = new AsyncCommand(WorkFlow_ViewForm_Command);
+            File_Enter_Search_Command = new AsyncCommandT<string>(WorkFlow_File_Enter_Search_Command);
+            History_Tag_Enter_Search_Command = new AsyncCommandT<string>(WorkFlow_History_Tag_Enter_Search_Command);
+            History_Ref_Enter_Search_Command = new AsyncCommandT<string>(WorkFlow_History_Ref_Enter_Search_Command);
         }
 
         public async Task WorkFlow_Pdf_Compare_Result()
@@ -267,40 +272,23 @@ namespace CadEye.ViewCS
             }
         }
 
-        public string TagText
-        {
-            get => _tagtext;
-            set
-            {
-                _tagtext = value;
-                OnPropertyChanged();
-                PlaceHolder(_tagtext);
-            }
-        } // 수정
-
-        public string FileText
-        {
-            get => _filetext;
-            set
-            {
-                _filetext = value;
-                OnPropertyChanged();
-                PlaceHolder(_tagtext);
-            }
-        } // 수정
-
-        public void PlaceHolder(string _tagtext)
-        {
-            if (string.IsNullOrEmpty(_tagtext))
-                TagText = "tag";
-        }
-
         public async Task WorkFlow_Tag_Enter_Search_Command(string text)
         {
             try
             {
-                if (string.IsNullOrWhiteSpace(text)) return;
                 await _functionCollection.Tag_Enter_SearchAsync(text);
+            }
+            catch (Exception ex)
+            {
+                _functionCollection.Event_History_Add($"{ex.Message}\n발생 위치:\n{ex.StackTrace}");
+            }
+        }
+
+        public async Task WorkFlow_File_Enter_Search_Command(string text)
+        {
+            try
+            {
+                await _functionCollection.File_Nmae_Enter_SearchAsync(text);
             }
             catch (Exception ex)
             {
@@ -341,6 +329,7 @@ namespace CadEye.ViewCS
                 await _functionCollection.Pdf_Reset();
                 await _functionCollection.LoadPdf();
                 File_History.Clear();
+                await _functionCollection.TagRef_History_Reset();
                 await _functionCollection.Data_View();
             }
             catch(Exception ex)
@@ -378,7 +367,9 @@ namespace CadEye.ViewCS
             try
             {
                 await _functionCollection.Pdf_Reset();
-                await _functionCollection.LoadPdf_Compare(file);
+                await _functionCollection.LoadPdf(file);
+                await _functionCollection.TagRef_History_Reset();
+                await _functionCollection.TagRef_History_Container(file);
             }
             catch(Exception ex)
             {
@@ -398,6 +389,15 @@ namespace CadEye.ViewCS
             }
         }
 
+        public async Task WorkFlow_History_Tag_Enter_Search_Command(string text)
+        {
+
+        }
+
+        public async Task WorkFlow_History_Ref_Enter_Search_Command(string text)
+        {
+
+        }
         protected void OnPropertyChanged([CallerMemberName] string propertyName = null)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
@@ -437,6 +437,8 @@ namespace CadEye.ViewCS
         public byte[] Main_Image = new byte[] { };
         public ObservableCollection<string> Ref { get; set; } = new ObservableCollection<string>();
         public ObservableCollection<string> Tag { get; set; } = new ObservableCollection<string>();
+        public ObservableCollection<string> History_Ref { get; set; } = new ObservableCollection<string>();
+        public ObservableCollection<string> History_Tag { get; set; } = new ObservableCollection<string>();
         public ObservableCollection<EventEntry> File_History { get; set; } = new ObservableCollection<EventEntry>();
         public byte[] Compare_Image = new byte[] { };
     }

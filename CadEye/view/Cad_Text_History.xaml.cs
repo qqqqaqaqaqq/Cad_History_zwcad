@@ -1,14 +1,30 @@
 ﻿using CadEye.ViewCS;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Data;
+using System.Windows.Documents;
+using System.Windows.Input;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
+using System.Windows.Navigation;
+using System.Windows.Shapes;
 
 namespace CadEye.View
 {
-    public partial class Cad_FileView : System.Windows.Controls.UserControl
+    /// <summary>
+    /// Cad_Text_History.xaml에 대한 상호 작용 논리
+    /// </summary>
+    public partial class Cad_Text_History : UserControl
     {
         private Bridge _vm { get; set; }
 
-        public Cad_FileView()
+
+        public Cad_Text_History()
         {
             InitializeComponent();
             _vm = Bridge.Instance;
@@ -28,15 +44,6 @@ namespace CadEye.View
                 PlaceHolder_Overlay_FileName.Visibility = Visibility.Hidden;
             else
                 PlaceHolder_Overlay_FileName.Visibility = Visibility.Visible;
-        }
-
-        public void Unvisible_btn()
-        {
-            DB_Update_btn.Visibility = Visibility.Hidden;
-            DB_Reset_btn.Visibility = Visibility.Hidden;
-            DB_Write_btn.Visibility = Visibility.Hidden;
-            DB_Read_btn.Visibility = Visibility.Visible;
-            DB_Backup_btn.Visibility = Visibility.Hidden;
         }
     }
 }
