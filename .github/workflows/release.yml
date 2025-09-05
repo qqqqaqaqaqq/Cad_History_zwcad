@@ -20,15 +20,15 @@ jobs:
 
     # 3. NuGet 패키지 복원 (필요할 경우)
     - name: Restore NuGet packages
-      run: nuget restore MyProject.sln
+      run: nuget restore CadEye.sln
 
     # 4. 솔루션 빌드 (Release 모드, Any CPU)
     - name: Build solution
-      run: msbuild MyProject.sln /p:Configuration=Release /p:Platform="Any CPU"
+      run: msbuild CadEye.sln /p:Configuration=Release /p:Platform="x64"
 
     # 5. 빌드 산출물 압축
     - name: Compress release output
-      run: Compress-Archive -Path "MyProject\\bin\\Release\\*" -DestinationPath "release.zip"
+      run: Compress-Archive -Path "CadEye\\bin\\Release\\*" -DestinationPath "release.zip"
 
     # 6. GitHub Release 생성 + zip 업로드
     - name: Create GitHub Release
