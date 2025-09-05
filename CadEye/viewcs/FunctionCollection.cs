@@ -170,7 +170,6 @@ namespace CadEye.ViewCs
             }
             return false;
         }
-
         public async Task<bool> Db_Read_Test()
         {
             await Task.Delay(50);
@@ -185,7 +184,6 @@ namespace CadEye.ViewCs
                 return false;
             }
         }
-
         public async Task DeleteFileSafely()
         {
             if (!File.Exists(_vb.user_file) && !File.Exists(_vb.user_log))
@@ -213,7 +211,6 @@ namespace CadEye.ViewCs
                 }
             }
         }
-
         public async Task<bool> SafeCopy(string source, string destination)
         {
             const int retries = 5;
@@ -296,7 +293,6 @@ namespace CadEye.ViewCs
                 Debug.WriteLine($"Open_Folder : {ex}");
             }
         }
-
         public void File_Open()
         {
             try
@@ -675,8 +671,6 @@ namespace CadEye.ViewCs
                 _vb.History_Tag.Clear();
             });
         }
-
-
         // ====================================================
 
         public void FolderWatcher()

@@ -30,20 +30,5 @@ namespace CadEye.View
             _vm = Bridge.Instance;
             this.DataContext = _vm;
         }
-
-        private void Overlay_Tag(object sender, TextChangedEventArgs e)
-        {
-            if (Tag_SearchText.Text.Length > 0)
-                PlaceHolder_Overlay_Tag.Visibility = Visibility.Hidden;
-            else
-                PlaceHolder_Overlay_Tag.Visibility = Visibility.Visible;
-        }
-        private void Overlay_FileName(object sender, TextChangedEventArgs e)
-        {
-            if (File_SearchText.Text.Length > 0)
-                PlaceHolder_Overlay_FileName.Visibility = Visibility.Hidden;
-            else
-                PlaceHolder_Overlay_FileName.Visibility = Visibility.Visible;
-        }
     }
 }

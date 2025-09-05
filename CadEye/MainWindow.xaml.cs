@@ -99,31 +99,49 @@ namespace CadEye
         private NotifyIcon _trayIcon;
         private void Traybutton_Click(object sender, RoutedEventArgs e)
         {
+            // 트레이 아이콘이 없으면 생성
             if (_trayIcon == null)
             {
                 _trayIcon = new NotifyIcon();
+
+                // 아이콘 경로
                 string iconPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "icon.ico");
                 _trayIcon.Icon = new Icon(iconPath);
-                _trayIcon.Visible = true;
-                _trayIcon.Text = "My WPF App";
 
+                _trayIcon.Visible = true;
+                _trayIcon.Text = "Cad Eye";
+
+                // 좌클릭 이벤트
                 _trayIcon.MouseClick += (s, args) =>
                 {
                     if (args.Button == MouseButtons.Left)
                     {
+                        // 아이콘 제거
+                        _trayIcon.Visible = false;
+                        _trayIcon.Dispose();
+                        _trayIcon = null;
+
+                        // 창 복원
                         this.Show();
                         this.WindowState = WindowState.Normal;
                     }
                 };
 
+                // 우클릭 메뉴
                 _trayIcon.ContextMenuStrip = new ContextMenuStrip();
                 _trayIcon.ContextMenuStrip.Items.Add("Exit", null, (s, args) =>
                 {
-                    _trayIcon.Visible = false;
+                    if (_trayIcon != null)
+                    {
+                        _trayIcon.Visible = false;
+                        _trayIcon.Dispose();
+                        _trayIcon = null;
+                    }
                     System.Windows.Application.Current.Shutdown();
                 });
             }
 
+            // 창 숨기기
             this.Hide();
         }
         private bool isExpanded = true;

@@ -41,8 +41,6 @@ namespace CadEye.ViewCS
         public AsyncCommandT<string> Tag_Enter_Search_Command { get; }
         public AsyncCommand ViewForm_Command { get; }
         public AsyncCommandT<string> File_Enter_Search_Command { get; }
-        public AsyncCommandT<string> History_Tag_Enter_Search_Command { get; }
-        public AsyncCommandT<string> History_Ref_Enter_Search_Command { get; }
         private static Bridge _instance;
         public static Bridge Instance
         {
@@ -74,8 +72,6 @@ namespace CadEye.ViewCS
             Tag_Enter_Search_Command = new AsyncCommandT<string>(WorkFlow_Tag_Enter_Search_Command);
             ViewForm_Command = new AsyncCommand(WorkFlow_ViewForm_Command);
             File_Enter_Search_Command = new AsyncCommandT<string>(WorkFlow_File_Enter_Search_Command);
-            History_Tag_Enter_Search_Command = new AsyncCommandT<string>(WorkFlow_History_Tag_Enter_Search_Command);
-            History_Ref_Enter_Search_Command = new AsyncCommandT<string>(WorkFlow_History_Ref_Enter_Search_Command);
         }
 
         public async Task WorkFlow_Pdf_Compare_Result()
@@ -389,15 +385,6 @@ namespace CadEye.ViewCS
             }
         }
 
-        public async Task WorkFlow_History_Tag_Enter_Search_Command(string text)
-        {
-
-        }
-
-        public async Task WorkFlow_History_Ref_Enter_Search_Command(string text)
-        {
-
-        }
         protected void OnPropertyChanged([CallerMemberName] string propertyName = null)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
