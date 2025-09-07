@@ -87,8 +87,9 @@ namespace CadEye.Lib
         public List<string> Feature { get; set; }
         public List<EventEntry> Event { get; set; }
         public List<ImageEntry> Image { get; set; }
-        public long Detele_Check { get; set; }
+        public int Detele_Check = 0;
     }
+
     public enum DbAction
     {
         Upsert,

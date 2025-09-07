@@ -139,6 +139,8 @@ namespace CadEye.Lib
                     source_node.AccesTime = access_time;
                     source_node.list = target_node.list;
                     source_node.Feature = target_node.Feature;
+                    source_node.Feature_Hisotry = target_node.Feature_Hisotry;
+                    source_node.List_History = target_node.List_History;    
                     source_node.Event = target_node.Event;
                     source_node.Image = target_node.Image;
 
@@ -173,6 +175,8 @@ namespace CadEye.Lib
             source_node.HashToken = target_node.HashToken;
             source_node.list = target_node.list;
             source_node.Feature = target_node.Feature;
+            source_node.Feature_Hisotry = target_node.Feature_Hisotry;
+            source_node.List_History = target_node.List_History;
             source_node.Event = target_node.Event;
             source_node.Image = target_node.Image;
             source_node.Detele_Check = 1;
@@ -288,6 +292,8 @@ namespace CadEye.Lib
                     source_node.HashToken = has;
                     source_node.list = target_node.list;
                     source_node.Feature = target_node.Feature;
+                    source_node.Feature_Hisotry = target_node.Feature_Hisotry;
+                    source_node.List_History = target_node.List_History;
                     source_node.Event = target_node.Event;
                     source_node.Image = target_node.Image;
 

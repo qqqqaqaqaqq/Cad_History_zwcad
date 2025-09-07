@@ -662,6 +662,7 @@ namespace CadEye.ViewCs
                 _vb.Pdf2.ResetHost();
             });
         }
+        
 
         public async Task TagRef_History_Reset()
         {

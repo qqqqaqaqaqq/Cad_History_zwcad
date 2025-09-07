@@ -362,7 +362,7 @@ namespace CadEye.ViewCS
         {
             try
             {
-                await _functionCollection.Pdf_Reset();
+                Pdf2.ResetHost(); // 수정
                 await _functionCollection.LoadPdf(file);
                 await _functionCollection.TagRef_History_Reset();
                 await _functionCollection.TagRef_History_Container(file);
